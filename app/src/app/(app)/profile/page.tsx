@@ -72,6 +72,19 @@ export default function ProfilePage() {
               <span>{user.team_id ? teamName(db, user.team_id) : 'מפקדה'}</span>
               <Muted>דירוג מפקד</Muted>
               <span className="tabnum">{user.rating}/10</span>
+              <Muted>נשק אישי</Muted>
+              <span className="tabnum">
+                {user.weapon || '—'}
+                {user.weapon_serial ? ` · צ׳ ${user.weapon_serial}` : ''}
+              </span>
+              <Muted>פרופיל רפואי</Muted>
+              <span className="tabnum">{user.medical_profile ?? '—'}</span>
+              {user.limitations ? (
+                <>
+                  <Muted>מגבלות</Muted>
+                  <span>{user.limitations}</span>
+                </>
+              ) : null}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

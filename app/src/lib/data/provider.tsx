@@ -52,6 +52,7 @@ const WATCHED = [
   'photos',
   'join_requests',
   'fleet',
+  'periods',
 ];
 
 export function DataProvider({ children }: { children: ReactNode }) {

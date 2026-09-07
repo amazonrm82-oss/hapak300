@@ -6,6 +6,7 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { TrainingFormDialog } from '@/components/dialogs/TrainingFormDialog';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { AuditLog } from '@/components/AuditLog';
+import { PeriodCard } from '@/components/PeriodCard';
 import { Field, SectionCard, Tag } from '@/components/ui/bits';
 import { TRAINING_STATUS, WEEKDAYS } from '@/lib/core/constants';
 import { pad, weekOf } from '@/lib/core/dates';
@@ -383,6 +384,8 @@ export default function ManagePage() {
           })}
         </div>
       </SectionCard>
+
+      <PeriodCard />
 
       <AuditLog />
 

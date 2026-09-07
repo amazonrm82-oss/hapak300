@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import { admin, anon, withinRate } from '@/lib/server/admin';
+import { vapidSubject } from '@/lib/server/push';
 
 /**
  * Sends a test push to the caller's own devices, and only to those.
@@ -45,11 +46,7 @@ export async function POST(request: Request) {
 
   if (!subs?.length) return NextResponse.json({ sent: 0 });
 
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? 'mailto:admin@hapak300.local',
-    publicKey,
-    privateKey,
-  );
+  webpush.setVapidDetails(vapidSubject(), publicKey, privateKey);
 
   const payload = JSON.stringify({
     title: 'כשירות חפ״ק מח״ט 300',

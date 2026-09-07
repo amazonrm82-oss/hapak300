@@ -156,6 +156,13 @@ begin
       if new.rating is distinct from old.rating then changed := array_append(changed, 'דירוג'); end if;
       if new.qual is distinct from old.qual then changed := array_append(changed, 'הסמכות הדרכה'); end if;
       if new.certs is distinct from old.certs then changed := array_append(changed, 'הסמכות אישיות'); end if;
+      if new.weapon is distinct from old.weapon
+         or new.weapon_serial is distinct from old.weapon_serial then
+        changed := array_append(changed, 'נשק אישי'); end if;
+      if new.medical_profile is distinct from old.medical_profile then
+        changed := array_append(changed, 'פרופיל רפואי'); end if;
+      if new.limitations is distinct from old.limitations then
+        changed := array_append(changed, 'מגבלות'); end if;
       if new.is_team_commander is distinct from old.is_team_commander then
         changed := array_append(changed, case when new.is_team_commander then 'מונה' else 'הוסר' end || ' מפקד צוות'); end if;
       if new.is_instructor is distinct from old.is_instructor then

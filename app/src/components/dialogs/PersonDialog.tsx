@@ -32,6 +32,10 @@ const emptyForm = (): PersonForm => ({
   is_hapak_commander: false,
   qual: [],
   certs: {},
+  weapon: '',
+  weapon_serial: '',
+  medical_profile: '',
+  limitations: '',
 });
 
 /**
@@ -63,6 +67,10 @@ export function PersonDialog({ open, person, onClose }: Props) {
         is_hapak_commander: person.is_hapak_commander,
         qual: [...person.qual],
         certs: Object.fromEntries(CERT_TYPES.map(([k]) => [k, person.certs[k] ?? ''])),
+        weapon: person.weapon ?? '',
+        weapon_serial: person.weapon_serial ?? '',
+        medical_profile: person.medical_profile ? String(person.medical_profile) : '',
+        limitations: person.limitations ?? '',
       });
     } else {
       setF(emptyForm());
@@ -231,6 +239,44 @@ export function PersonDialog({ open, person, onClose }: Props) {
               <option value="active">פעיל</option>
               <option value="inactive">מושבת זמנית (פצוע / חו״ל)</option>
             </select>
+          </Field>
+          <Field label="נשק אישי">
+            <select className="input" value={f.weapon} onChange={set('weapon')}>
+              <option value="">לא הוזן</option>
+              {db.weapons.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="מספר נשק (צ׳)">
+            <input
+              className="input tabnum"
+              value={f.weapon_serial}
+              onChange={set('weapon_serial')}
+              placeholder="נראה למפקדים וללוחם עצמו בלבד"
+            />
+          </Field>
+          <Field label="פרופיל רפואי (21–97)">
+            <input
+              className="input tabnum"
+              inputMode="numeric"
+              maxLength={2}
+              value={f.medical_profile}
+              onChange={(e) =>
+                setF((s) => ({ ...s, medical_profile: e.target.value.replace(/\D/g, '').slice(0, 2) }))
+              }
+              placeholder="ריק = לא הוזן"
+            />
+          </Field>
+          <Field label="מגבלות">
+            <input
+              className="input"
+              value={f.limitations}
+              onChange={set('limitations')}
+              placeholder="למשל: פטור מריצה עד 01/2027"
+            />
           </Field>
           {f.status === 'inactive' && (
             <Field label="סיבת ההשבתה">

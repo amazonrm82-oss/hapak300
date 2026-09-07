@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { admin } from '@/lib/server/admin';
+import { vapidSubject } from '@/lib/server/push';
 
 /**
  * Setup diagnostics, in Hebrew.
@@ -32,6 +33,8 @@ export async function GET() {
 
   const push = {
     configured: env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY,
+    // Apple rejects a token whose subject is not a real address; Google does not
+    subject: vapidSubject(),
     note: env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY
       ? 'התראות פוש מוגדרות'
       : 'התראות פוש לא מוגדרות — הוסף NEXT_PUBLIC_VAPID_PUBLIC_KEY ו-VAPID_PRIVATE_KEY ב-Vercel ועשה Redeploy',

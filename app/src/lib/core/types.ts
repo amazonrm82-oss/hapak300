@@ -68,6 +68,12 @@ export interface Person {
   is_admin: boolean;
   is_hapak_commander: boolean;
   certs: Partial<Record<CertType, string>>; // expiry dates
+  /** The weapon this fighter holds; the serial is masked from other fighters. */
+  weapon: string;
+  weapon_serial: string;
+  /** Israeli medical profile, 21–97, or null when it has not been entered. */
+  medical_profile: number | null;
+  limitations: string;
   notif: NotifPrefs;
   has_pin: boolean; // the hash itself never leaves the server
 }
@@ -276,9 +282,31 @@ export interface Db {
   weapons: string[];
   locations: string[];
   fleet: FleetVehicle[];
+  periods: ClosedPeriod[];
   calendar: CalendarEvent[];
   notifications: Notification[];
   join_requests: JoinRequest[];
+}
+
+/** A training period after it was closed — kept as it looked on the last day. */
+export interface ClosedPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  closed_at: string;
+  trainings: number;
+  note: string;
+  summary: {
+    name: string;
+    role: string;
+    team: string;
+    rating: number;
+    assigned: number;
+    attended: number;
+    absent: number;
+    expired: number;
+  }[];
 }
 
 export interface RotationConfig {

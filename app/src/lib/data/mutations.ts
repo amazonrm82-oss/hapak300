@@ -699,6 +699,10 @@ export interface PersonForm {
   is_hapak_commander: boolean;
   qual: string[];
   certs: Record<string, string>;
+  weapon: string;
+  weapon_serial: string;
+  medical_profile: string; // kept as text in the form; '' means not entered
+  limitations: string;
 }
 
 export async function savePerson(
@@ -739,7 +743,17 @@ export async function savePerson(
     is_hapak_commander: form.is_hapak_commander,
     qual: form.qual,
     certs,
+    weapon: form.weapon.trim(),
+    weapon_serial: form.weapon_serial.trim(),
+    // 21–97 is the Israeli scale; anything else is treated as not entered
+    medical_profile: /^\d{2}$/.test(form.medical_profile.trim())
+      ? Number(form.medical_profile.trim())
+      : null,
+    limitations: form.limitations.trim(),
   };
+
+  if (row.medical_profile !== null && (row.medical_profile < 21 || row.medical_profile > 97))
+    throw new Error('פרופיל רפואי חייב להיות בין 21 ל-97 (או ריק)');
 
   // never let an administrator strip their own management rights
   if (personId === user.id && !row.is_admin && !row.is_hapak_commander) {
@@ -804,6 +818,13 @@ export const resetPin = (pid: string) => rpc('reset_pin', { pid });
 
 /** Ends every session that person has open, without changing their code. */
 export const revokeSessions = (pid: string) => rpc('revoke_sessions', { pid });
+
+/** Closes the period that is running and opens the next one, keeping a summary. */
+export async function closePeriod(name: string, start: string, note: string): Promise<void> {
+  if (!name.trim()) throw new Error('נדרש שם לתקופה החדשה');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) throw new Error('תאריך התחלה לא תקין');
+  await rpc('close_period', { new_name: name.trim(), new_start: start, note: note.trim() });
+}
 
 export const setMyNotif = (prefs: Person['notif']) => rpc('set_my_notif', { prefs });
 

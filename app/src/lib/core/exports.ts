@@ -169,3 +169,97 @@ export function downloadText(filename: string, text: string, mime = 'text/csv;ch
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/**
+ * The whole unit, as one JSON file the administrator can keep.
+ *
+ * A hosted database is not a backup: a wrong delete, an expired project or a
+ * lost account takes everything with it. This is what the unit actually owns —
+ * every training, every attendance mark, every fighter, readable without this
+ * app ever running again.
+ */
+export function backupJSON(db: Db): string {
+  return JSON.stringify(
+    {
+      exported_at: new Date().toISOString(),
+      format: 'hapak300-backup-1',
+      settings: db.settings,
+      teams: db.teams,
+      topics: db.topics,
+      people: db.people,
+      trainings: db.trainings,
+      fleet: db.fleet,
+      periods: db.periods,
+      calendar: db.calendar,
+      catalogs: {
+        gear: db.gear_catalog,
+        vehicle_types: db.vehicle_types,
+        weapons: db.weapons,
+        locations: db.locations,
+      },
+    },
+    null,
+    2,
+  );
+}
+
+/**
+ * The period report the brigade asks for: who was assigned to what, who turned
+ * up, the commander's rating, and which certifications lapsed.
+ *
+ * Computed from the trainings inside the period rather than from a running
+ * total, so it says the same thing next month as it does today.
+ */
+export function periodReportHTML(db: Db, fromISO: string, toISO: string, title: string): string {
+  const inPeriod = db.trainings.filter(
+    (t) => t.status !== 'cancelled' && t.date >= fromISO && t.date <= toISO,
+  );
+
+  const roster = db.people.filter((p) => p.status === 'active' && p.team_id);
+  const body = roster
+    .map((p) => {
+      const mine = inPeriod.filter((t) => t.team_id === 'joint' || t.team_id === p.team_id);
+      const came = mine.filter((t) => {
+        const a = t.attendance[p.id];
+        return a && (a.status === 'coming' || a.status === 'late');
+      }).length;
+      const pct = mine.length ? Math.round((came / mine.length) * 100) : 0;
+      const expired = Object.values(p.certs).filter((d) => d && d < toISO).length;
+      return [
+        fullName(p),
+        p.role,
+        teamName(db, p.team_id),
+        `${came}/${mine.length}`,
+        `${pct}%`,
+        `${p.rating}/10`,
+        expired ? `${expired} פקעו` : '—',
+      ];
+    })
+    .sort((a, b) => a[2].localeCompare(b[2], 'he') || a[0].localeCompare(b[0], 'he'));
+
+  const held = inPeriod.length;
+  const joint = inPeriod.filter((t) => t.team_id === 'joint').length;
+
+  return (
+    `<h1>דו״ח כשירות תקופתי · ${esc(db.settings.unit_name)}</h1>` +
+    `<h2>${esc(title)} · ${esc(fmtFull(fromISO))} — ${esc(fmtFull(toISO))}</h2>` +
+    `<p class="muted">${held} אימונים בתקופה, מתוכם ${joint} משותפים · ${roster.length} לוחמים</p>` +
+    `<table><thead><tr><th>לוחם</th><th>תפקיד</th><th>צוות</th><th>נוכחות</th><th>אחוז</th>` +
+    `<th>דירוג מפקד</th><th>הסמכות</th></tr></thead><tbody>${rows(body)}</tbody></table>` +
+    `<h2 style="margin-top:18px">האימונים שהתקיימו</h2>` +
+    `<table><thead><tr><th>תאריך</th><th>נושא</th><th>צוות</th><th>מיקום</th><th>מדריך</th></tr></thead><tbody>` +
+    rows(
+      inPeriod
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((t) => [
+          fmtFull(t.date),
+          topicName(db, t.topic_id),
+          t.team_id === 'joint' ? 'משותף' : teamName(db, t.team_id),
+          t.location,
+          fullName(personById(db, t.instructor_id)),
+        ]),
+    ) +
+    `</tbody></table>`
+  );
+}

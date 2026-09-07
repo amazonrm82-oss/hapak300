@@ -160,27 +160,21 @@ create policy people_delete on people for delete to authenticated using (is_admi
 -- on their own row is the administrator's to change.
 create or replace function guard_people_self_edit() returns trigger
 language plpgsql security definer set search_path = public as $$
+-- Everything except these is the commander's to change. Comparing the whole
+-- row rather than a list of columns means a column added later is protected
+-- from the moment it exists — the earlier version listed the fields by hand,
+-- so `weapon_serial` and `medical_profile` were briefly a fighter's own to
+-- edit, and any future field would have been too.
+declare allowed text[] := array['notif', 'updated_at'];
 begin
-  -- No end-user JWT means the server is acting for itself: the login routes
-  -- write `pin_hash` and `auth_id` with the service key, which carries no
-  -- token. Without this exemption a fighter's chosen code was silently
-  -- rejected and they were asked to choose one again on every single login.
-  -- Ordinary sessions cannot reach here without a token — writes to `people`
-  -- are granted to `authenticated` alone.
+  -- no end-user JWT: the server acting for itself (the login routes write
+  -- `pin_hash` and `auth_id` with the service key, which carries no token)
   if auth.uid() is null then return new; end if;
   if is_admin() then return new; end if;
   if new.id <> me_id() then
     raise exception 'אין הרשאה לערוך לוחם אחר';
   end if;
-  -- self-service is limited to notification preferences
-  if (new.rank, new.name, new.role, new.pn, new.phone, new.team_id, new.status,
-      new.rating, new.qual, new.is_team_commander, new.is_instructor,
-      new.is_admin, new.is_hapak_commander, new.certs, new.pin_hash)
-     is distinct from
-     (old.rank, old.name, old.role, old.pn, old.phone, old.team_id, old.status,
-      old.rating, old.qual, old.is_team_commander, old.is_instructor,
-      old.is_admin, old.is_hapak_commander, old.certs, old.pin_hash)
-  then
+  if (to_jsonb(new) - allowed) is distinct from (to_jsonb(old) - allowed) then
     raise exception 'רק מנהל מערכת או מפקד החפ״ק יכולים לשנות פרטים, הרשאות והסמכות';
   end if;
   return new;

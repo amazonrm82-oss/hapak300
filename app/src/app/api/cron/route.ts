@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { admin } from '@/lib/server/admin';
+import { vapidSubject } from '@/lib/server/push';
 
 /**
  * The reminders, run on a schedule (pg_cron in Supabase calls this route every
@@ -51,8 +52,9 @@ async function run(request: Request) {
 
   const created = await createReminders(db, today, clock);
   const pushed = await deliverPush(db);
+  const backup = await weeklyBackup(db, now, today);
 
-  return NextResponse.json({ ok: true, today, now: clock, created, pushed });
+  return NextResponse.json({ ok: true, today, now: clock, created, pushed, backup });
 }
 
 /** Constant-time comparison, so a wrong guess reveals nothing by how long it took. */
@@ -207,11 +209,7 @@ async function deliverPush(db: SupabaseClient): Promise<number> {
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return 0; // push is optional
 
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? 'mailto:admin@hapak300.local',
-    publicKey,
-    privateKey,
-  );
+  webpush.setVapidDetails(vapidSubject(), publicKey, privateKey);
 
   const { data: pending } = await db
     .from('notifications')
@@ -262,6 +260,65 @@ async function deliverPush(db: SupabaseClient): Promise<number> {
     await db.from('notifications').update({ pushed_at: new Date().toISOString() }).eq('id', n.id);
   }
   return sent;
+}
+
+// ── the weekly backup ──────────────────────────────────────────────────────
+
+/**
+ * A copy of the whole unit, written once a week into a private bucket.
+ *
+ * A hosted database is not a backup — a wrong delete or a closed project takes
+ * everything with it, and the manual export only exists if somebody remembers
+ * to press it. This one does not need remembering. Only the leadership can read
+ * the bucket, and the four most recent copies are kept.
+ */
+async function weeklyBackup(db: SupabaseClient, now: Date, today: string): Promise<string> {
+  // Sunday, in the quiet hour before the day starts
+  const israel = new Date(now.toLocaleString('en-US', { timeZone: TZ }));
+  if (israel.getDay() !== 0 || israel.getHours() !== 3) return 'לא היום';
+
+  const name = `hapak300-${today}.json`;
+  const { data: existing } = await db.storage.from('backups').list('', { search: name });
+  if (existing?.some((f) => f.name === name)) return 'כבר קיים';
+
+  const tables = [
+    'settings', 'teams', 'topics', 'people', 'trainings', 'day_blocks', 'attendance',
+    'gear_items', 'vehicles', 'ammo', 'food', 'chat_messages', 'feedback', 'photos',
+    'calendar_events', 'fleet', 'periods', 'gear_catalog', 'vehicle_types', 'weapons',
+    'locations', 'audit_log',
+  ];
+
+  const dump: Record<string, unknown> = {
+    exported_at: new Date().toISOString(),
+    format: 'hapak300-backup-1',
+  };
+  for (const table of tables) {
+    const { data, error } = await db.from(table).select('*');
+    if (error) {
+      console.error(`backup: ${table} failed:`, error.message);
+      return `נכשל על ${table}`;
+    }
+    dump[table] = data ?? [];
+  }
+
+  const { error: upErr } = await db.storage
+    .from('backups')
+    .upload(name, JSON.stringify(dump), { contentType: 'application/json', upsert: true });
+  if (upErr) {
+    console.error('backup upload failed:', upErr.message);
+    return 'ההעלאה נכשלה';
+  }
+
+  // keep the four most recent
+  const { data: all } = await db.storage.from('backups').list('', { limit: 100 });
+  const stale = (all ?? [])
+    .map((f) => f.name)
+    .filter((n) => n.endsWith('.json'))
+    .sort()
+    .slice(0, -4);
+  if (stale.length) await db.storage.from('backups').remove(stale);
+
+  return name;
 }
 
 // ── small date helpers, in Israel time ─────────────────────────────────────

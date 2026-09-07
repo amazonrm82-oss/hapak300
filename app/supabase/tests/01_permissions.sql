@@ -482,3 +482,81 @@ select case when (select count(*) from people_view) = 0 then '✅' else '❌' en
 select case when (select count(*) from trainings_view) = 0 then '✅' else '❌' end ||
        '  67  ואינו רואה את לו״ז האימונים';
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ WHAT A FIGHTER CARRIES IS THE COMMANDER'S TO SET ════════
+set request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+set role authenticated;
+do $t$ begin
+  update people set medical_profile = 45, weapon = 'M4', weapon_serial = 'X1'
+   where id = (select id from people_view where pn = '7455120');
+  raise notice '✅  69  מפקד מזין נשק אישי ופרופיל רפואי';
+exception when others then
+  raise notice '❌  69  המפקד נחסם — %', sqlerrm;
+end $t$;
+reset role; reset request.jwt.claim.sub;
+
+-- 7455120 is the fighter whose devices were revoked earlier, so use a token
+-- issued after that revocation
+select set_config('request.jwt.claims', '{"iat":4000000000}', false);
+insert into auth.users (id) values ('77777777-7777-7777-7777-777777777777');
+update people set auth_id = '77777777-7777-7777-7777-777777777777' where pn = '7455120';
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+set role authenticated;
+
+do $t$ begin
+  update people set medical_profile = 97 where id = me_id();
+  raise notice '❌  70  לוחם שינה לעצמו פרופיל רפואי — כשל';
+exception when others then
+  raise notice '✅  70  לוחם נחסם משינוי הפרופיל הרפואי של עצמו';
+end $t$;
+
+do $t$ begin
+  update people set weapon_serial = 'זיוף' where id = me_id();
+  raise notice '❌  71  לוחם שינה לעצמו מספר נשק — כשל';
+exception when others then
+  raise notice '✅  71  לוחם נחסם משינוי מספר הנשק של עצמו';
+end $t$;
+
+select case when (select weapon_serial from people_view where id = me_id()) = 'X1'
+            then '✅' else '❌' end || '  72  הלוחם רואה את מספר הנשק של עצמו';
+-- addressed by name: this fighter cannot see anyone else's personal number
+-- either, so `where pn = …` would match nothing and prove nothing
+select case when (select weapon_serial from people_view where name = 'דניאל כץ') = ''
+            then '✅' else '❌' end || '  73  ומספר הנשק של אחר מוסתר ממנו';
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ CLOSING A PERIOD ════════
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+do $t$ begin
+  perform close_period('קיץ 2026', (current_date + 30)::date, '');
+  raise notice '❌  74  לוחם סגר תקופה — כשל אבטחה';
+exception when others then
+  raise notice '✅  74  לוחם נחסם מסגירת תקופה';
+end $t$;
+reset role; reset request.jwt.claim.sub;
+
+-- the seeded period starts a month out; move it behind the test training so
+-- the closing summary has something to count
+update settings set period_start = current_date - 7 where id;
+
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+do $t$ begin
+  perform close_period('קיץ 2026', (select period_start from settings), '');
+  raise notice '❌  75  תקופה חדשה שמתחילה לפני הקודמת התקבלה';
+exception when others then
+  raise notice '✅  75  תאריך התחלה לא תקין נדחה';
+end $t$;
+
+select close_period('קיץ 2026', (current_date + 30)::date, 'סיום תקופת חורף') is not null;
+select case when (select period_name from settings) = 'קיץ 2026'
+            then '✅' else '❌' end || '  76  התקופה החדשה נפתחה';
+select case when (select count(*) from periods) = 1
+            then '✅' else '❌' end || '  77  התקופה שנסגרה נשמרה בארכיון';
+select case when jsonb_array_length((select summary from periods limit 1)) > 0
+            then '✅' else '❌' end || '  78  הסיכום כולל שורה לכל לוחם';
+select case when (select trainings from periods limit 1) >= 1
+            then '✅' else '❌' end || '  79  מספר האימונים בתקופה נספר';
+reset role; reset request.jwt.claim.sub;
