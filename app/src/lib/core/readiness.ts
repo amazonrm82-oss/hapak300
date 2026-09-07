@@ -1,4 +1,4 @@
-import { participants } from './selectors';
+import { isRostered, participants } from './selectors';
 import type { Db, Person } from './types';
 
 export interface ReadinessPart {
@@ -24,8 +24,10 @@ export function readinessOf(db: Db, filterFn: (p: Person) => boolean): Readiness
   if (!members.length) return { score: 0, parts: [], note: 'אין לוחמים' };
 
   const ratingAvg = members.reduce((s, p) => s + (p.rating || 0), 0) / members.length;
+  // סדיר is rostered to every training, so membership is asked of the roster
+  // rule rather than compared by team id
   const done = db.trainings.filter(
-    (t) => t.status === 'done' && members.some((p) => t.team_id === 'joint' || t.team_id === p.team_id),
+    (t) => t.status === 'done' && members.some((p) => isRostered(db, p, t.team_id)),
   );
 
   const parts: ReadinessPart[] = [{ label: 'דירוג מפקד', w: 0.5, v: ratingAvg }];

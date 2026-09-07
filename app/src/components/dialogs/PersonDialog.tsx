@@ -222,6 +222,7 @@ export function PersonDialog({ open, person, onClose }: Props) {
             <select className="input" value={f.team_id} onChange={set('team_id')}>
               <option value="a">{db.teams.a.name}</option>
               <option value="b">{db.teams.b.name}</option>
+              <option value="c">{db.teams.c.name}</option>
               <option value="">מפקדה (ללא צוות)</option>
             </select>
           </Field>

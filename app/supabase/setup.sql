@@ -31,7 +31,8 @@
 create extension if not exists pgcrypto;
 
 -- ── enums ──────────────────────────────────────────────────────────────────
-create type team_key as enum ('a', 'b');
+-- 'c' is סדיר: a roster group that trains with א׳ and ב׳ rather than alone
+create type team_key as enum ('a', 'b', 'c');
 create type training_team as enum ('a', 'b', 'joint');
 create type person_status as enum ('active', 'inactive');
 create type training_status as enum ('planned', 'published', 'done', 'cancelled');
@@ -77,6 +78,8 @@ create trigger settings_updated before update on settings
 create table teams (
   id           team_key primary key,
   name         text not null,
+  -- a team that joins every other team's training instead of holding its own
+  attends_all  boolean not null default false,
   commander_id uuid,           -- FK added after people exists
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
@@ -520,14 +523,16 @@ language sql stable security definer set search_path = public as $$
   select is_admin() or is_team_cmd() or is_training_cmd(tid) or is_training_instr(tid)
 $$;
 
--- taking part in the training: rostered to the team, or its instructor/commander
+-- taking part in the training: rostered to the team, a member of a team that
+-- joins every training (סדיר), or its instructor or commander
 create or replace function is_participant(tid uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from trainings t
     where t.id = tid
       and (t.team_id = 'joint' or t.team_id::text = my_team()::text
-           or t.instructor_id = me_id() or t.commander_id = me_id())
+           or t.instructor_id = me_id() or t.commander_id = me_id()
+           or exists (select 1 from teams tm where tm.id = my_team() and tm.attends_all))
   )
 $$;
 
@@ -944,13 +949,16 @@ create policy push_own on push_subscriptions for all to authenticated
 -- permission the UI checks, then does its work in a single transaction.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Everyone rostered to the training's team (joint = both teams).
+-- Everyone rostered to the training's team (joint = both teams), plus any team
+-- marked `attends_all` — סדיר, who train with א׳ and ב׳ and never on their own.
 create or replace function training_participants(tid uuid)
 returns setof people
 language sql stable security definer set search_path = public as $$
   select p.* from people p, trainings t
   where t.id = tid and p.status = 'active' and p.team_id is not null
-    and (t.team_id = 'joint' or p.team_id::text = t.team_id::text)
+    and (t.team_id = 'joint'
+         or p.team_id::text = t.team_id::text
+         or exists (select 1 from teams tm where tm.id = p.team_id and tm.attends_all))
 $$;
 
 -- Raises a notification for a list of people (null = the whole unit).
@@ -2059,7 +2067,12 @@ values (true, 'כשירות חפ״ק מח״ט 300', 'חפ״ק מח״ט 300', '',
         true, true, 6, array['חובש','נהג','מאבטח'], 48, '18:00', 120, 48, 30, 7)
 on conflict (id) do nothing;
 
-insert into teams (id, name) values ('a', 'צוות א׳'), ('b', 'צוות ב׳')
+-- סדיר has no trainings of its own: its members are rostered to every training
+-- that צוות א׳ or צוות ב׳ hold, which is what `attends_all` means.
+insert into teams (id, name, attends_all) values
+  ('a', 'צוות א׳', false),
+  ('b', 'צוות ב׳', false),
+  ('c', 'סדיר',    true)
 on conflict (id) do nothing;
 
 insert into topics (id, name, safety, sort) values

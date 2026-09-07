@@ -4,6 +4,8 @@ import type {
   Db,
   Person,
   Settings,
+  Team,
+  TeamKey,
   TrainingFull,
 } from '@/lib/core/types';
 
@@ -185,13 +187,18 @@ export async function loadDb(): Promise<Db> {
     };
   });
 
-  const teamRows = (teams.data ?? []) as { id: 'a' | 'b'; name: string; commander_id: string | null }[];
+  const teamRows = (teams.data ?? []) as Team[];
+  // סדיר ('c') joins every training rather than holding its own; a database
+  // that predates it simply has no row, and the fallback keeps the app working
+  const team = (id: TeamKey, name: string, attendsAll = false): Team =>
+    teamRows.find((t) => t.id === id) ?? { id, name, attends_all: attendsAll, commander_id: null };
 
   return {
     settings: settings.data as Settings,
     teams: {
-      a: teamRows.find((t) => t.id === 'a') ?? { id: 'a', name: 'צוות א׳', commander_id: null },
-      b: teamRows.find((t) => t.id === 'b') ?? { id: 'b', name: 'צוות ב׳', commander_id: null },
+      a: team('a', 'צוות א׳'),
+      b: team('b', 'צוות ב׳'),
+      c: team('c', 'סדיר', true),
     },
     topics: (topics.data ?? []) as Db['topics'],
     people: ((people.data ?? []) as Record<string, unknown>[]).map(

@@ -62,6 +62,12 @@ async function notify(text: string, to: string[] | null, trainingId: string | nu
 
 const participantIds = (db: Db, t: TrainingFull) => participants(db, t).map((p) => p.id);
 
+/** Team ids that join every training — סדיר, and anything set up like it. */
+const attendsAllTeams = (db: Db): string[] =>
+  Object.values(db.teams)
+    .filter((t) => t.attends_all)
+    .map((t) => t.id);
+
 // ── attendance ─────────────────────────────────────────────────────────────
 
 export async function markAttendance(
@@ -162,7 +168,14 @@ function draftFor(db: Db, o: {
   const departure = addMinutes(o.start, -DEPARTURE_LEAD_MINUTES);
   // What the commander filled in on the form wins; anything they left alone
   // falls back to the proposal computed from the topic and the roster.
-  const defaults = defaultLogistics(o.topic_id, o.team_id, o.start, db.people, o.location);
+  const defaults = defaultLogistics(
+    o.topic_id,
+    o.team_id,
+    o.start,
+    db.people,
+    o.location,
+    attendsAllTeams(db),
+  );
   const logi = {
     gear: o.gear ?? defaults.gear,
     vehicles: o.vehicles ?? defaults.vehicles,

@@ -32,7 +32,7 @@ export function rankSort(a: Person, b: Person): number {
   );
 }
 
-export function teamName(db: Db, teamId: TrainingTeam | null): string {
+export function teamName(db: Db, teamId: TrainingTeam | TeamKey | null): string {
   if (teamId === 'joint') return 'משותף';
   if (teamId === 'a' || teamId === 'b') return db.teams[teamId]?.name ?? '—';
   return '—';
@@ -49,12 +49,17 @@ export function trainingTitle(db: Db, t: Pick<Training, 'team_id' | 'seq'>): str
 export const statusLabel = (t: Pick<Training, 'status'>) => TRAINING_STATUS[t.status];
 
 /** Everyone rostered to a team who takes part in this training. */
+/** Whose training this is: the rostered team, plus anyone in a team that joins
+ *  every training — סדיר trains with א׳ and ב׳ and never on its own. */
 export function participants(db: Db, t: Pick<Training, 'team_id'>): Person[] {
-  return db.people
-    .filter(
-      (p) => p.status === 'active' && p.team_id && (t.team_id === 'joint' || p.team_id === t.team_id),
-    )
-    .sort(rankSort);
+  return db.people.filter((p) => isRostered(db, p, t.team_id)).sort(rankSort);
+}
+
+/** True when this person takes part in a training held by `teamId`. */
+export function isRostered(db: Db, p: Person, teamId: TrainingTeam): boolean {
+  if (p.status !== 'active' || !p.team_id) return false;
+  if (teamId === 'joint' || p.team_id === teamId) return true;
+  return !!db.teams[p.team_id]?.attends_all;
 }
 
 export function teamMembers(db: Db, teamId: TeamKey): Person[] {

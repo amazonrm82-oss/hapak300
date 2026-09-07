@@ -45,7 +45,17 @@ const proposeLogistics = (
   teamId: TrainingTeam,
   start: string,
   location: string,
-): LogisticsDraft => defaultLogistics(topicId === '__new' ? '' : topicId, teamId, start || '07:00', db.people, location);
+): LogisticsDraft =>
+  defaultLogistics(
+    topicId === '__new' ? '' : topicId,
+    teamId,
+    start || '07:00',
+    db.people,
+    location,
+    Object.values(db.teams)
+      .filter((t) => t.attends_all)
+      .map((t) => t.id),
+  );
 
 /** Every field the unit made mandatory before a training may be published. */
 export function TrainingFormDialog({ open, training, week = 1, onClose }: Props) {

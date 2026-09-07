@@ -560,3 +560,45 @@ select case when jsonb_array_length((select summary from periods limit 1)) > 0
 select case when (select trainings from periods limit 1) >= 1
             then '✅' else '❌' end || '  79  מספר האימונים בתקופה נספר';
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ סדיר: מצטרף לכל אימון, ולעולם לא מתאמן לבד ════════
+reset role; reset request.jwt.claim.sub;
+
+insert into people (team_id, rank, name, role, pn, phone, rating)
+values ('c', 'רב״ט', 'עומר סדיר', 'מאבטח', '7300001', '052-8888888', 7);
+
+select case when (select count(*) from training_participants((select id from trainings limit 1))
+                   where pn = '7300001') = 1
+            then '✅' else '❌' end || '  80  לוחם סדיר משובץ לאימון של צוות א׳';
+
+select case when (select attends_all from teams where id = 'c')
+            then '✅' else '❌' end || '  81  סדיר מסומן כמצטרף לכל אימון';
+
+-- and the invitation reaches them: the published-training notification is
+-- addressed to the participants, סדיר included
+insert into auth.users (id) values ('88888888-8888-8888-8888-888888888888');
+update people set auth_id = '88888888-8888-8888-8888-888888888888' where pn = '7300001';
+set request.jwt.claim.sub = '88888888-8888-8888-8888-888888888888';
+set role authenticated;
+
+select case when is_participant((select id from trainings limit 1))
+            then '✅' else '❌' end || '  82  ומזוהה כמשתתף — נוכחות, צ׳אט וזימון';
+
+do $t$ begin
+  insert into attendance (training_id, person_id, status, reason)
+  values ((select id from trainings limit 1), me_id(), 'coming', '');
+  raise notice '✅  83  לוחם סדיר מסמן נוכחות באימון של צוות א׳';
+exception when others then
+  raise notice '❌  83  לוחם סדיר נחסם מסימון נוכחות — %', sqlerrm;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- a training can only belong to א׳, ב׳ or both — never to סדיר alone
+do $t$ begin
+  insert into trainings (team_id, topic_id, date, start_time, end_time)
+  values ('c', 'setup', current_date + 20, '07:00', '17:00');
+  raise notice '❌  84  נוצר אימון של סדיר בלבד — לא אמור להיות אפשרי';
+exception when others then
+  raise notice '✅  84  אי אפשר ליצור אימון של סדיר בלבד';
+end $t$;

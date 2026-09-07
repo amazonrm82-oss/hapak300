@@ -145,6 +145,7 @@ export default function TeamsPage() {
               >
                 <option value="a">{db.teams.a.name}</option>
                 <option value="b">{db.teams.b.name}</option>
+                <option value="c">{db.teams.c.name}</option>
               </select>
             </Field>
             <button
@@ -218,7 +219,7 @@ export default function TeamsPage() {
       ))}
 
       <div className="hapak-teams-grid">
-        {(['a', 'b'] as TeamKey[]).map((tm) => {
+        {(['a', 'b', 'c'] as TeamKey[]).map((tm) => {
           const members = teamMembers(db, tm);
           const r = readinessOf(db, (p) => p.team_id === tm);
           const cmd = personById(db, db.teams[tm].commander_id);

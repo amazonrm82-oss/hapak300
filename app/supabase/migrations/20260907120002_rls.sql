@@ -98,14 +98,16 @@ language sql stable security definer set search_path = public as $$
   select is_admin() or is_team_cmd() or is_training_cmd(tid) or is_training_instr(tid)
 $$;
 
--- taking part in the training: rostered to the team, or its instructor/commander
+-- taking part in the training: rostered to the team, a member of a team that
+-- joins every training (סדיר), or its instructor or commander
 create or replace function is_participant(tid uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from trainings t
     where t.id = tid
       and (t.team_id = 'joint' or t.team_id::text = my_team()::text
-           or t.instructor_id = me_id() or t.commander_id = me_id())
+           or t.instructor_id = me_id() or t.commander_id = me_id()
+           or exists (select 1 from teams tm where tm.id = my_team() and tm.attends_all))
   )
 $$;
 

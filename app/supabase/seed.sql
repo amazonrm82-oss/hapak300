@@ -13,7 +13,12 @@ values (true, 'כשירות חפ״ק מח״ט 300', 'חפ״ק מח״ט 300', '',
         true, true, 6, array['חובש','נהג','מאבטח'], 48, '18:00', 120, 48, 30, 7)
 on conflict (id) do nothing;
 
-insert into teams (id, name) values ('a', 'צוות א׳'), ('b', 'צוות ב׳')
+-- סדיר has no trainings of its own: its members are rostered to every training
+-- that צוות א׳ or צוות ב׳ hold, which is what `attends_all` means.
+insert into teams (id, name, attends_all) values
+  ('a', 'צוות א׳', false),
+  ('b', 'צוות ב׳', false),
+  ('c', 'סדיר',    true)
 on conflict (id) do nothing;
 
 insert into topics (id, name, safety, sort) values

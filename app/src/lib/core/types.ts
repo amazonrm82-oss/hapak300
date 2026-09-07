@@ -3,8 +3,10 @@
  * from Supabase are usable as-is — there is no mapping layer to drift out of sync.
  */
 
-export type TeamKey = 'a' | 'b';
-export type TrainingTeam = TeamKey | 'joint';
+/** 'c' is סדיר — a roster group that joins א׳ and ב׳ rather than training alone. */
+export type TeamKey = 'a' | 'b' | 'c';
+/** A training belongs to one of the two teams, or to both. סדיר never has its own. */
+export type TrainingTeam = 'a' | 'b' | 'joint';
 export type PersonStatus = 'active' | 'inactive';
 export type TrainingStatus = 'planned' | 'published' | 'done' | 'cancelled';
 export type InviteStatus = 'pending' | 'accepted' | 'declined';
@@ -41,6 +43,8 @@ export interface Settings {
 export interface Team {
   id: TeamKey;
   name: string;
+  /** Joins every other team's training instead of holding its own. */
+  attends_all: boolean;
   commander_id: string | null;
 }
 

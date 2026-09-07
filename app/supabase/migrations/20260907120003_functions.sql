@@ -3,13 +3,16 @@
 -- permission the UI checks, then does its work in a single transaction.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Everyone rostered to the training's team (joint = both teams).
+-- Everyone rostered to the training's team (joint = both teams), plus any team
+-- marked `attends_all` — סדיר, who train with א׳ and ב׳ and never on their own.
 create or replace function training_participants(tid uuid)
 returns setof people
 language sql stable security definer set search_path = public as $$
   select p.* from people p, trainings t
   where t.id = tid and p.status = 'active' and p.team_id is not null
-    and (t.team_id = 'joint' or p.team_id::text = t.team_id::text)
+    and (t.team_id = 'joint'
+         or p.team_id::text = t.team_id::text
+         or exists (select 1 from teams tm where tm.id = p.team_id and tm.attends_all))
 $$;
 
 -- Raises a notification for a list of people (null = the whole unit).

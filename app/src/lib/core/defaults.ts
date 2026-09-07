@@ -139,9 +139,15 @@ export function defaultVehicles(
   teamId: TrainingTeam,
   start: string,
   people: Person[],
+  attendsAll: string[] = [],
 ): NewVehicle[] {
   const drivers = people.filter(
-    (p) => p.role === 'נהג' && p.status === 'active' && (teamId === 'joint' ? !!p.team_id : p.team_id === teamId),
+    (p) =>
+      p.role === 'נהג' &&
+      p.status === 'active' &&
+      (teamId === 'joint'
+        ? !!p.team_id
+        : p.team_id === teamId || (p.team_id ? attendsAll.includes(p.team_id) : false)),
   );
   const dep = addMinutes(start, -DEPARTURE_LEAD_MINUTES);
   const types = teamId === 'joint' ? ['האמר', 'האמר', 'האמר', 'רוביקון', 'RZR'] : ['האמר', 'האמר', 'האמר'];
@@ -185,16 +191,22 @@ export function defaultLogistics(
   start: string,
   people: Person[],
   location: string,
+  attendsAll: string[] = [],
 ): DefaultLogistics {
+  // סדיר joins whatever א׳ or ב׳ are doing, so they count towards the food,
+  // the seats and the ammunition for every training
   const roster = people.filter(
-    (p) => p.status === 'active' && p.team_id && (teamId === 'joint' || p.team_id === teamId),
+    (p) =>
+      p.status === 'active' &&
+      p.team_id &&
+      (teamId === 'joint' || p.team_id === teamId || attendsAll.includes(p.team_id)),
   );
   const n = roster.length || (teamId === 'joint' ? 20 : 10);
   const atBase = /בסיס/.test(location || '');
   return {
     gear: defaultGear(topicId),
     ammo: defaultAmmo(topicId, n),
-    vehicles: defaultVehicles(teamId, start, people),
+    vehicles: defaultVehicles(teamId, start, people, attendsAll),
     food: defaultFood(topicId, n, atBase),
   };
 }

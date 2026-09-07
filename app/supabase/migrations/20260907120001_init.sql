@@ -6,7 +6,8 @@
 create extension if not exists pgcrypto;
 
 -- ── enums ──────────────────────────────────────────────────────────────────
-create type team_key as enum ('a', 'b');
+-- 'c' is סדיר: a roster group that trains with א׳ and ב׳ rather than alone
+create type team_key as enum ('a', 'b', 'c');
 create type training_team as enum ('a', 'b', 'joint');
 create type person_status as enum ('active', 'inactive');
 create type training_status as enum ('planned', 'published', 'done', 'cancelled');
@@ -52,6 +53,8 @@ create trigger settings_updated before update on settings
 create table teams (
   id           team_key primary key,
   name         text not null,
+  -- a team that joins every other team's training instead of holding its own
+  attends_all  boolean not null default false,
   commander_id uuid,           -- FK added after people exists
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()

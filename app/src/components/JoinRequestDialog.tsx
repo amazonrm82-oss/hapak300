@@ -95,6 +95,7 @@ export function JoinRequestDialog({ open, onClose }: { open: boolean; onClose: (
           <select className="input" value={f.team_id} onChange={set('team_id')}>
             <option value="a">{db?.teams.a.name ?? 'צוות א׳'}</option>
             <option value="b">{db?.teams.b.name ?? 'צוות ב׳'}</option>
+            <option value="c">{db?.teams.c.name ?? 'סדיר'}</option>
           </select>
         </Field>
       </div>
