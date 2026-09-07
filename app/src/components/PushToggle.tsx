@@ -99,7 +99,7 @@ export function PushToggle() {
 
       const err = await save(sub, userId);
       if (err) {
-        setProblem(err);
+        setProblem(`רישום המכשיר בשרת נכשל: ${err}`);
         return setState('off');
       }
       setDevices((n) => n + 1);
@@ -145,7 +145,7 @@ export function PushToggle() {
       toast('התראות מופעלות במכשיר הזה');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'הפעלת ההתראות נכשלה';
-      setProblem(msg);
+      setProblem(`רישום המכשיר בשרת נכשל: ${msg}`);
       setState('off');
       toast(msg);
     }
@@ -182,8 +182,19 @@ export function PushToggle() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'שליחת הבדיקה נכשלה');
 
+      const results = (body.results ?? []) as { device: string; ok: boolean; error?: string }[];
+      const failed = results.filter((r) => !r.ok);
+      setProblem(
+        failed.length ? failed.map((r) => `${r.device}: ${r.error ?? 'נכשל'}`).join(' · ') : '',
+      );
+
       if (body.sent) {
-        toast(`נשלחה התראת בדיקה ל-${body.sent} מכשירים — אמורה להופיע תוך שניות`);
+        const names = results.filter((r) => r.ok).map((r) => r.device).join(', ');
+        toast(
+          failed.length
+            ? `נשלח ל-${names}. ${failed.length} מכשירים נכשלו — הפירוט למטה`
+            : `נשלחה התראת בדיקה ל-${names} — אמורה להופיע תוך שניות`,
+        );
       } else {
         // the server has no subscription for this person: re-register and retry
         toast('המכשיר לא היה רשום בשרת — רושם אותו עכשיו');
@@ -257,7 +268,7 @@ export function PushToggle() {
 
       {problem && (
         <span style={{ fontSize: 11.5, color: 'var(--color-accent-300)', lineHeight: 1.6 }}>
-          רישום המכשיר בשרת נכשל: {problem}
+          {problem}
         </span>
       )}
     </div>

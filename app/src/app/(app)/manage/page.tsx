@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { TrainingFormDialog } from '@/components/dialogs/TrainingFormDialog';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
+import { AuditLog } from '@/components/AuditLog';
 import { Field, SectionCard, Tag } from '@/components/ui/bits';
 import { TRAINING_STATUS, WEEKDAYS } from '@/lib/core/constants';
 import { pad, weekOf } from '@/lib/core/dates';
@@ -382,6 +383,8 @@ export default function ManagePage() {
           })}
         </div>
       </SectionCard>
+
+      <AuditLog />
 
       <RotationDialog open={generatorOpen} onClose={() => setGeneratorOpen(false)} />
       <ShiftDialog open={shiftOpen} onClose={() => setShiftOpen(false)} />

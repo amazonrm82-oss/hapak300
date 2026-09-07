@@ -20,6 +20,13 @@ create or replace function auth.uid() returns uuid language sql stable as $fn$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $fn$;
 
+-- The whole claim set, as Supabase exposes it. Tests that care about token
+-- freshness set request.jwt.claims; the rest leave it empty, which reads as a
+-- token with no `iat` — treated as issued at epoch 0, i.e. never revoked.
+create or replace function auth.jwt() returns jsonb language sql stable as $fn$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$fn$;
+
 create schema if not exists storage;
 create table storage.buckets (id text primary key, name text, public boolean);
 create table storage.objects (

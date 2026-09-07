@@ -58,21 +58,45 @@ export async function POST(request: Request) {
     tag: 'hapak-test',
   });
 
-  let sent = 0;
+  const results: { device: string; ok: boolean; error?: string }[] = [];
+
   for (const s of subs) {
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
       );
-      sent++;
+      results.push({ device: deviceOf(s.endpoint), ok: true });
     } catch (err) {
-      // 404/410 means the browser dropped the subscription — clean it up
       const status = (err as { statusCode?: number }).statusCode;
+      const body = (err as { body?: string }).body;
+      // 404/410 means the browser dropped the subscription — clean it up
       if (status === 404 || status === 410)
         await db.from('push_subscriptions').delete().eq('endpoint', s.endpoint);
+      results.push({
+        device: deviceOf(s.endpoint),
+        ok: false,
+        error:
+          status === 404 || status === 410
+            ? 'המנוי במכשיר הזה פג — הפעל את ההתראות שוב במכשיר עצמו'
+            : `שירות הדחיפה החזיר ${status ?? '?'}${body ? ` · ${String(body).slice(0, 120)}` : ''}`,
+      });
     }
   }
 
-  return NextResponse.json({ sent });
+  return NextResponse.json({ sent: results.filter((r) => r.ok).length, results });
+}
+
+/**
+ * Which phone this subscription belongs to, from the push service it uses.
+ * When one device gets the notification and another does not, this is what
+ * turns "it does not work" into "Apple rejected the iPhone's subscription".
+ */
+function deviceOf(endpoint: string): string {
+  if (endpoint.includes('push.apple.com')) return 'אייפון';
+  if (endpoint.includes('fcm.googleapis.com') || endpoint.includes('android.googleapis.com'))
+    return 'אנדרואיד / Chrome';
+  if (endpoint.includes('mozilla.com') || endpoint.includes('mozaws')) return 'Firefox';
+  if (endpoint.includes('notify.windows.com')) return 'Windows / Edge';
+  return 'דפדפן';
 }

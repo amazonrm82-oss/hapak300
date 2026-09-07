@@ -802,6 +802,9 @@ export async function removePerson(pid: string): Promise<void> {
 
 export const resetPin = (pid: string) => rpc('reset_pin', { pid });
 
+/** Ends every session that person has open, without changing their code. */
+export const revokeSessions = (pid: string) => rpc('revoke_sessions', { pid });
+
 export const setMyNotif = (prefs: Person['notif']) => rpc('set_my_notif', { prefs });
 
 // ── settings, catalogs, topics ─────────────────────────────────────────────

@@ -391,3 +391,94 @@ select case when not bump_rate_limit('test:key', 3, 600)
             then '✅' else '❌' end || '  54  הפנייה הרביעית נחסמת';
 select case when bump_rate_limit('test:other', 3, 600)
             then '✅' else '❌' end || '  55  מגבלה נספרת בנפרד לכל קורא';
+
+-- ════════ ENDING A SESSION THAT IS ALREADY OPEN ════════
+-- Resetting a code used to leave the phone in someone's pocket signed in, and
+-- deactivating a fighter only blocked the next login.
+reset role; reset request.jwt.claim.sub;
+select set_config('request.jwt.claims', '{"iat":1000000}', false);
+
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+select case when me_id() is not null then '✅' else '❌' end || '  56  טוקן תקין מזוהה';
+reset role; reset request.jwt.claim.sub;
+
+-- the commander revokes that fighter's devices
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+select revoke_sessions((select id from people_view where pn = '7466718'));
+reset role; reset request.jwt.claim.sub;
+
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+select case when me_id() is null then '✅' else '❌' end ||
+       '  57  הטוקן הישן נדחה מיד אחרי ניתוק המכשירים';
+select case when (select count(*) from attendance) = 0 then '✅' else '❌' end ||
+       '  58  ובלי זהות אין גישה לנתוני היחידה';
+reset role; reset request.jwt.claim.sub;
+
+-- a deactivated fighter loses access without anyone revoking anything
+update people set status = 'inactive' where pn = '7480932';
+insert into auth.users (id) values ('66666666-6666-6666-6666-666666666666');
+update people set auth_id = '66666666-6666-6666-6666-666666666666' where pn = '7480932';
+
+set request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+set role authenticated;
+select case when me_id() is null then '✅' else '❌' end ||
+       '  59  לוחם שהושבת מאבד גישה גם אם הוא כבר מחובר';
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ THE AUDIT LOG ════════
+select case when exists (
+  select 1 from audit_log where entity = 'people' and action = 'הוספה' and subject like '%יואב ברק%'
+) then '✅' else '❌' end || '  60  הוספת לוחם נרשמה ביומן';
+
+select case when exists (
+  select 1 from audit_log where entity = 'people' and detail like '%מונה מנהל מערכת%'
+) then '✅' else '❌' end || '  61  מינוי הרשאה נרשם ביומן';
+
+select case when exists (
+  select 1 from audit_log where entity = 'people' and detail like '%ניתוק כל המכשירים%'
+) then '✅' else '❌' end || '  62  ניתוק מכשירים נרשם ביומן';
+
+select case when exists (
+  select 1 from audit_log where entity = 'trainings' and action = 'הוספה'
+) then '✅' else '❌' end || '  63  יצירת אימון נרשמה ביומן';
+
+-- the log is the leadership's, and nobody may rewrite it
+set request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+set role authenticated;
+-- a delete with no privilege raises; with a privilege but no policy it would
+-- quietly affect nothing, so check the rows are still there either way
+do $t$
+declare before int; after int;
+begin
+  select count(*) into before from audit_log;
+  begin
+    delete from audit_log;
+  exception when others then null;
+  end;
+  select count(*) into after from audit_log;
+  if after = before and before > 0 then
+    raise notice '✅  64  היומן שרד ניסיון מחיקה';
+  else
+    raise notice '❌  64  היומן נמחק — כשל אבטחה (% → %)', before, after;
+  end if;
+end $t$;
+do $t$ begin
+  insert into audit_log (action, entity, subject) values ('הוספה', 'people', 'רשומה מזויפת');
+  raise notice '❌  65  נכתבה רשומה מזויפת ליומן — כשל אבטחה';
+exception when others then
+  raise notice '✅  65  אי אפשר לכתוב ליומן ידנית';
+end $t$;
+reset role; reset request.jwt.claim.sub;
+
+-- a revoked or deactivated token must not read the roster either: the views
+-- run as their owner, so the policies on `people` never see them
+set request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+set role authenticated;
+select case when (select count(*) from people_view) = 0 then '✅' else '❌' end ||
+       '  66  לוחם מושבת אינו קורא את רשימת היחידה';
+select case when (select count(*) from trainings_view) = 0 then '✅' else '❌' end ||
+       '  67  ואינו רואה את לו״ז האימונים';
+reset role; reset request.jwt.claim.sub;

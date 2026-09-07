@@ -7,7 +7,7 @@ import { CERT_TYPES, RANKS, ROLES } from '@/lib/core/constants';
 import { canEditPerson, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
-import { removePerson, resetPin, savePerson, type PersonForm } from '@/lib/data/mutations';
+import { removePerson, resetPin, revokeSessions, savePerson, type PersonForm } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
 interface Props {
@@ -115,6 +115,23 @@ export function PersonDialog({ open, person, onClose }: Props) {
             {person && perms.canManagePeople && person.id !== user.id && !locked && (
               <button className="btn btn-ghost" onClick={() => setConfirmRemove(true)}>
                 הסרה מהמערכת
+              </button>
+            )}
+            {person && perms.canManagePeople && !locked && (
+              <button
+                className="btn btn-ghost"
+                title="מכשיר שאבד או הושאל — כל הסשנים הפתוחים נסגרים מיד"
+                onClick={async () => {
+                  try {
+                    await revokeSessions(person.id);
+                    await refresh();
+                    toast(`כל המכשירים של ${fullName(person)} נותקו — הכניסה הבאה תדרוש את הקוד`);
+                  } catch (e) {
+                    toast(e instanceof Error ? e.message : 'הניתוק נכשל');
+                  }
+                }}
+              >
+                ניתוק כל המכשירים
               </button>
             )}
             {person?.has_pin && !locked && (

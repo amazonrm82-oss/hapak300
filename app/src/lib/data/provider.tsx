@@ -32,6 +32,9 @@ interface AppState {
 
 const Ctx = createContext<AppState | null>(null);
 
+/** Half an hour untouched ends the session. */
+const IDLE_LIMIT_MS = 30 * 60 * 1000;
+
 /** Tables whose changes should pull a fresh snapshot. */
 const WATCHED = [
   'trainings',
@@ -129,6 +132,55 @@ export function DataProvider({ children }: { children: ReactNode }) {
     () => (db && personId ? (db.people.find((p) => p.id === personId) ?? null) : null),
     [db, personId],
   );
+
+  /**
+   * The session was ended elsewhere — a commander disconnected this device, or
+   * the fighter was marked inactive. The database stops answering as soon as
+   * that happens, so the roster comes back empty; without this the screen would
+   * sit on "loading" forever instead of saying what happened.
+   */
+  useEffect(() => {
+    if (loading || !db || !personId || user) return;
+    void supabase()
+      .auth.signOut()
+      .then(() => {
+        setDb(null);
+        setAuthId(null);
+        setError('החיבור למכשיר הזה נותק. היכנס מחדש עם המספר האישי והקוד.');
+      });
+  }, [loading, db, personId, user]);
+
+  /**
+   * Signed out after half an hour untouched. On a phone with the app on the
+   * Home Screen the tab never closes, so the session would otherwise stay open
+   * until the device died — which is exactly the wrong behaviour for a phone
+   * that gets left somewhere.
+   */
+  useEffect(() => {
+    if (!authId) return;
+    let last = Date.now();
+    const touch = () => {
+      last = Date.now();
+    };
+    const events = ['pointerdown', 'keydown', 'visibilitychange'] as const;
+    events.forEach((e) => window.addEventListener(e, touch, { passive: true }));
+
+    const id = setInterval(() => {
+      if (Date.now() - last < IDLE_LIMIT_MS) return;
+      void supabase()
+        .auth.signOut()
+        .then(() => {
+          setDb(null);
+          setAuthId(null);
+          setError('הסשן הסתיים לאחר חצי שעה ללא פעילות. היכנס מחדש.');
+        });
+    }, 60_000);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, touch));
+      clearInterval(id);
+    };
+  }, [authId]);
 
   const perms = useMemo(() => (db ? permsFor(db, user, null) : permsFor(EMPTY_DB, null, null)), [db, user]);
 
