@@ -18,7 +18,22 @@ export const RANKS = [
 
 export const RANK_ORDER: Record<string, number> = Object.fromEntries(RANKS.map((r, i) => [r, i]));
 
-export const ROLES = ['מפקד צוות', 'קמב״צ', 'קשר', 'נהג', 'חובש', 'מאבטח'] as const;
+// The job a person holds in the force. Distinct from the permission flags:
+// "מפקד חפ״ק" here is the post, while the rights that come with it are the
+// `is_hapak_commander` checkbox on the same form.
+export const ROLES = [
+  'מפקד צוות',
+  'מפקד חפ״ק',
+  'קמב״צ',
+  'קשר',
+  'נהג',
+  'חובש',
+  'מאבטח',
+  'נגביסט',
+  'קלע',
+  'מטוליסט',
+  'מפק״ץ',
+] as const;
 export const ESSENTIAL_ROLES = ['חובש', 'נהג', 'מאבטח'] as const;
 
 export const WEAPONS = [
