@@ -71,7 +71,12 @@ insert into storage.buckets (id, name, public) values
 on conflict (id) do nothing;
 
 -- Signed URLs only: any signed-in member of the unit may read and upload,
--- and remove what they uploaded themselves.
+-- and remove what they uploaded themselves. Dropped first so this file can be
+-- run again safely.
+drop policy if exists "unit reads objects" on storage.objects;
+drop policy if exists "unit uploads objects" on storage.objects;
+drop policy if exists "owner removes objects" on storage.objects;
+
 create policy "unit reads objects" on storage.objects for select to authenticated
   using (bucket_id in ('training-photos', 'training-orders', 'chat-attachments'));
 create policy "unit uploads objects" on storage.objects for insert to authenticated

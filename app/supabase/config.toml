@@ -1,0 +1,44 @@
+# Supabase project configuration.
+# `supabase link` fills in the project ref; nothing secret belongs in this file.
+
+project_id = "hapak300"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# the synthetic address a personal number maps to; nothing is ever sent to it
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = false          # accounts are created by the auth functions only
+enable_confirmations = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+# The login functions are called before anyone has a session, so they are
+# reached with the anon key — which is itself a valid JWT, so verification stays on.
+[functions.auth-login]
+verify_jwt = true
+
+[functions.auth-set-pin]
+verify_jwt = true
+
+[functions.run-automations]
+verify_jwt = true
