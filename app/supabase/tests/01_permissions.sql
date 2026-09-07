@@ -261,3 +261,34 @@ exception when others then
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ THE LOGIN ROUTES ════════
+-- The server writes pin_hash and auth_id with the service key, which carries
+-- no JWT. The self-edit guard used to reject exactly that, the route ignored
+-- the error, and every fighter was asked to choose a code again on every
+-- login. `reset role` below is the closest local stand-in: no JWT, triggers
+-- still firing.
+reset role; reset request.jwt.claim.sub;
+
+do $t$ begin
+  update people set pin_hash = 'pbkdf2$210000$x$y', pin_set_at = now() where pn = '7466718';
+  raise notice '✅  40  השרת שומר את הקוד שהלוחם בחר';
+exception when others then
+  raise notice '❌  40  שמירת הקוד נכשלה — % ← הלוחם יתבקש לבחור קוד בכל כניסה', sqlerrm;
+end $t$;
+
+select case when (select pin_hash from people where pn='7466718') is not null
+            then '✅' else '❌' end || '  41  הקוד נשמר ובכניסה הבאה יידרש רק הקוד';
+
+-- and a fighter still cannot set their own hash by hand
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$ begin
+  update people set pin_hash = 'pbkdf2$210000$a$b' where id = me_id();
+  raise notice '❌  42  לוחם כתב לעצמו hash של קוד — כשל אבטחה';
+exception when others then
+  raise notice '✅  42  לוחם נחסם מלכתוב לעצמו קוד ישירות';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

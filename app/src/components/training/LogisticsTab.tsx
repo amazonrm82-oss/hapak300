@@ -392,9 +392,43 @@ function VehiclesSection({
         </table>
       </div>
 
+      {canEdit && fleet.filter((x) => x.active).length > 0 && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* one tap per vehicle the unit already registered, צ׳ and all */}
+          <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>הוספה מהצי:</span>
+          {fleet
+            .filter((x) => x.active)
+            .map((x) => {
+              const taken = t.vehicles.some((veh) => veh.tz === x.tz);
+              return (
+                <button
+                  key={x.id}
+                  className="btn btn-secondary"
+                  disabled={taken}
+                  style={{ fontSize: 12, minHeight: 32, padding: '4px 10px', opacity: taken ? 0.45 : 1 }}
+                  onClick={() =>
+                    void run(() =>
+                      addVehicle(t.id, {
+                        type: x.type,
+                        tz: x.tz,
+                        driver_id: '',
+                        seats: x.seats,
+                        departure: t.departure,
+                      }),
+                    )
+                  }
+                >
+                  {taken ? '✓' : '+'} {x.type} · צ׳ {x.tz}
+                  {x.fitness === 'כשיר' ? '' : ` · ${x.fitness}`}
+                </button>
+              );
+            })}
+        </div>
+      )}
+
       {canEdit && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* pick a vehicle the unit already registered, צ׳ and all */}
+          {/* or set one up by hand */}
           {fleet.filter((x) => x.active).length > 0 && (
             <select
               className="input"

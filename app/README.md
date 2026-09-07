@@ -228,6 +228,8 @@ node supabase/build-setup.mjs   # בונה מחדש את setup.sql מהמיגר�
 
 **״חסרה הגדרת Supabase״** — `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` חסרים. שים לב שה-URL הוא הבסיס בלבד, **בלי** `/rest/v1/`.
 
+**המערכת מבקשת לבחור קוד בכל כניסה מחדש** — `pin_hash` לא נשמר. מסלולי הכניסה כותבים אותו עם מפתח השרת, שאין לו JWT של משתמש, והטריגר `guard_people_self_edit` דחה בדיוק את זה. מתוקן ב-`supabase/patch-01-admin-rank.sql`; בדיקה: `select name, pin_hash is not null as has_pin from people;`
+
 **נכנסים ומיד חוזרים למסך הכניסה** — `PIN_PEPPER`, `AUTH_DERIVE_SECRET` או `SUPABASE_SERVICE_ROLE_KEY` חסרים בין משתני הסביבה. הוסף ב-Vercel והרץ Redeploy.
 
 **״המספר האישי לא רשום״ למי שכן הוספת** — בדוק שהמספר הוא בדיוק 7 ספרות ושהלוחם בסטטוס ״פעיל״.

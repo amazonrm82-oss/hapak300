@@ -75,7 +75,16 @@ export async function mintSession(db: SupabaseClient, personId: string, pn: stri
       app_metadata: { person_id: personId },
     });
     if (error || !created.user) return null;
-    await db.from('people').update({ auth_id: created.user.id }).eq('id', personId);
+    // without `auth_id` the database cannot tell which fighter the session
+    // belongs to, so a session that could not be linked is no session at all
+    const { error: linkError } = await db
+      .from('people')
+      .update({ auth_id: created.user.id })
+      .eq('id', personId);
+    if (linkError) {
+      console.error('mintSession: linking auth_id failed:', linkError);
+      return null;
+    }
   }
 
   const { data, error } = await anon().auth.signInWithPassword({ email, password });

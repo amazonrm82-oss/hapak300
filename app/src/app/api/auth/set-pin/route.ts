@@ -58,10 +58,30 @@ export async function POST(request: Request) {
       { status: 409 },
     );
 
-  await db
+  // Never sign anyone in on a code that was not stored: that put them back on
+  // "choose a code" at every login, which looked like the code was being
+  // ignored rather than like a failure.
+  const { error: saveError } = await db
     .from('people')
     .update({ pin_hash: await hashPin(pin), pin_set_at: new Date().toISOString() })
     .eq('id', person.id);
+
+  if (saveError) {
+    console.error('set-pin save failed:', saveError);
+    return NextResponse.json(
+      { error: `שמירת הקוד נכשלה — הקוד לא נשמר, אז לא נכניס אותך. פנה למנהל המערכת. (${saveError.message})` },
+      { status: 500 },
+    );
+  }
+
+  // read it back: the write must be visible before a session is issued
+  const { data: saved } = await db.from('people').select('pin_hash').eq('id', person.id).maybeSingle();
+  if (!saved?.pin_hash)
+    return NextResponse.json(
+      { error: 'הקוד לא נשמר בבסיס הנתונים. פנה למנהל המערכת — ייתכן שחסר עדכון בבסיס הנתונים.' },
+      { status: 500 },
+    );
+
   await clearFailures(db, pn);
 
   const session = await mintSession(db, person.id, pn);

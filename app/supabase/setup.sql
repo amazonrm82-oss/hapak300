@@ -583,6 +583,13 @@ create policy people_delete on people for delete to authenticated using (is_admi
 create or replace function guard_people_self_edit() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  -- No end-user JWT means the server is acting for itself: the login routes
+  -- write `pin_hash` and `auth_id` with the service key, which carries no
+  -- token. Without this exemption a fighter's chosen code was silently
+  -- rejected and they were asked to choose one again on every single login.
+  -- Ordinary sessions cannot reach here without a token — writes to `people`
+  -- are granted to `authenticated` alone.
+  if auth.uid() is null then return new; end if;
   if is_admin() then return new; end if;
   if new.id <> me_id() then
     raise exception 'אין הרשאה לערוך לוחם אחר';

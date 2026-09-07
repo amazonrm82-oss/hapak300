@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { NewAmmo, NewFood, NewGear, NewVehicle } from '@/lib/core/defaults';
 import { VehicleTypeSelect } from '@/components/VehicleTypeSelect';
 import { FITNESS_OPTIONS } from '@/lib/core/constants';
@@ -32,6 +33,24 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
   const patch = (part: Partial<LogisticsDraft>) => onChange({ ...value, ...part });
 
   const fleet = db.fleet.filter((v) => v.active);
+
+  /** Adds one vehicle, inheriting the departure time already in use. */
+  const addVehicle = (v: Partial<NewVehicle> & { type: string }) =>
+    onChange({
+      ...value,
+      vehicles: [
+        ...value.vehicles,
+        {
+          tz: '',
+          driver_id: null,
+          seats: 6,
+          departure: value.vehicles[0]?.departure ?? '05:30',
+          fitness: 'כשיר',
+          fault: '',
+          ...v,
+        },
+      ],
+    });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -88,36 +107,69 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
       <Section
         title="רכבים"
         count={value.vehicles.length}
-        onAdd={() =>
-          patch({
-            vehicles: [
-              ...value.vehicles,
-              {
-                type: fleet[0]?.type ?? db.vehicle_types[0] ?? 'האמר',
-                tz: fleet[0]?.tz ?? '',
-                driver_id: null,
-                seats: fleet[0]?.seats ?? 6,
-                departure: value.vehicles[0]?.departure ?? '05:30',
-                fitness: 'כשיר',
-                fault: '',
-              },
-            ],
-          })
-        }
+        onAdd={() => addVehicle({ type: db.vehicle_types[0] ?? 'האמר' })}
       >
-        {fleet.length === 0 && (
+        {/* One tap per vehicle. The type is the choice that matters first —
+            האמר, RZR, רוביקון — so it is a row of buttons, not a field to
+            find inside a wide row. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>הוספה מהירה:</span>
+          {db.vehicle_types.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: 12, minHeight: 32, padding: '4px 10px' }}
+              onClick={() => addVehicle({ type })}
+            >
+              + {type}
+            </button>
+          ))}
+        </div>
+
+        {fleet.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>מהצי, עם הצ׳:</span>
+            {fleet.map((x) => {
+              const taken = value.vehicles.some((v) => v.tz === x.tz);
+              return (
+                <button
+                  key={x.id}
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={taken}
+                  style={{ fontSize: 12, minHeight: 32, padding: '4px 10px', opacity: taken ? 0.45 : 1 }}
+                  onClick={() =>
+                    addVehicle({ type: x.type, tz: x.tz, seats: x.seats, fitness: x.fitness })
+                  }
+                >
+                  {taken ? '✓' : '+'} {x.type} · צ׳ {x.tz}
+                  {x.fitness === 'כשיר' ? '' : ` · ${x.fitness}`}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
           <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
-            צי הרכבים ריק — אפשר להקליד צ׳ ידנית, או להוסיף רכבים פעם אחת במסך הלוגיסטיקה ולבחור
-            אותם מכאן.
+            רכבי היחידה נרשמים פעם אחת ב<b>לוגיסטיקה → צי הרכבים</b>, עם הצ׳ שלהם — ואז הם מופיעים
+            כאן ככפתור בלחיצה אחת, בלי להקליד צ׳ מחדש בכל אימון.
           </span>
         )}
+
         {value.vehicles.map((v, i) => (
           <Row key={i} onRemove={() => patch({ vehicles: value.vehicles.filter((_, j) => j !== i) })}>
-            {fleet.length > 0 && (
+            <VehicleTypeSelect
+              label="סוג"
+              value={v.type}
+              types={db.vehicle_types}
+              onChange={(type) => patch({ vehicles: replace(value.vehicles, i, { ...v, type }) })}
+              style={{ width: 132 }}
+            />
+            {fleet.length > 0 ? (
               <select
-                className="input"
-                aria-label="בחירה מהצי"
-                value={fleet.some((x) => x.tz === v.tz) ? v.tz : ''}
+                className="input tabnum"
+                aria-label="צ׳ מהצי"
+                value={fleet.some((x) => x.tz === v.tz) ? v.tz : '__manual'}
                 onChange={(e) => {
                   const pick = fleet.find((x) => x.tz === e.target.value);
                   patch({
@@ -130,27 +182,20 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
                     ),
                   });
                 }}
-                style={{ flex: 1, minWidth: 160 }}
+                style={{ width: 150 }}
               >
-                <option value="">בחר מהצי / הקלדה ידנית</option>
+                <option value="__manual">צ׳ — הקלדה</option>
                 {fleet.map((x) => (
                   <option key={x.id} value={x.tz}>
-                    {x.type} · צ׳ {x.tz}
-                    {x.fitness === 'כשיר' ? '' : ` · ${x.fitness}`}
+                    צ׳ {x.tz} · {x.type}
                   </option>
                 ))}
               </select>
-            )}
-            <VehicleTypeSelect
-              label="סוג"
-              value={v.type}
-              types={db.vehicle_types}
-              onChange={(type) => patch({ vehicles: replace(value.vehicles, i, { ...v, type }) })}
-              style={{ width: 132 }}
-            />
+            ) : null}
             <input
               className="input tabnum"
               placeholder="צ׳"
+              aria-label="מספר צ׳"
               value={v.tz}
               onChange={(e) => patch({ vehicles: replace(value.vehicles, i, { ...v, tz: e.target.value }) })}
               style={{ width: 96 }}
@@ -209,6 +254,10 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
             </select>
           </Row>
         ))}
+
+        <span className="tabnum" style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
+          {value.vehicles.reduce((n, v) => n + (v.seats || 0), 0)} מקומות ב-{value.vehicles.length} רכבים
+        </span>
       </Section>
 
       {/* ── תחמושת ── */}
@@ -342,8 +391,15 @@ function Section({
   onAdd: () => void;
   children: React.ReactNode;
 }) {
+  // Open once, on the section's own terms — a section the commander collapsed
+  // must not spring back open on the next keystroke elsewhere in the form.
+  const [open, setOpen] = useState(count > 0);
   return (
-    <details open={count > 0} style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 8 }}>
+    <details
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+      style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 8 }}
+    >
       <summary style={{ cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ flex: 1 }}>
           {title} <span style={{ color: 'var(--color-neutral-500)' }}>({count})</span>
