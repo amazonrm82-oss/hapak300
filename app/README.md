@@ -8,138 +8,87 @@
 
 ---
 
-## 1. מה צריך להתקין פעם אחת
+## 1. איך זה בנוי לפריסה
 
-| מה | איך |
+אין שלב build מקומי ואין CLI. הקוד יושב ב-GitHub, **Vercel** מושך ובונה אותו,
+ו-**Supabase** מקבל את הסכמה בהדבקה אחת בדפדפן. כל לוגיקת השרת — הכניסה
+והתזכורות — היא Route Handlers של Next.js, ולא Supabase Edge Functions, כדי
+שההקמה לא תדרוש להתקין דבר על מחשב היעד.
+
+| מה | איפה רץ |
 |---|---|
-| **Node.js 20+** | [nodejs.org](https://nodejs.org) — גרסת LTS |
-| **Supabase CLI** | `npm install -g supabase` |
-| **חשבון Supabase** | [supabase.com](https://supabase.com) — התוכנית החינמית מספיקה ליחידה בגודל הזה |
-| **חשבון Vercel** (לפרסום) | [vercel.com](https://vercel.com) — גם כאן החינמית מספיקה |
+| מסכים | Next.js (Vercel) |
+| כניסה: `POST /api/auth/login`, `/api/auth/set-pin` | Node runtime, service-role key |
+| תזכורות: `POST /api/cron` | Node runtime, מוגן ב-`CRON_SECRET` |
+| מזג אוויר: `GET /api/weather` | Node runtime |
+| נתונים, הרשאות, Realtime, Storage | Supabase |
+| תזמון | `pg_cron` + `pg_net` בתוך Supabase, קורא ל-`/api/cron` |
+
+> **המדריך המלא להקמה, צעד אחר צעד ובלי ידע קודם, נמצא ב-[`מדריך-התקנה.md`](./%D7%9E%D7%93%D7%A8%D7%99%D7%9A-%D7%94%D7%AA%D7%A7%D7%A0%D7%94.md).**
+> הסעיפים כאן הם התקציר למפתחים.
 
 ---
 
-## 2. הקמת בסיס הנתונים (כ-15 דקות)
+## 2. הקמה מהירה
 
-### 2.1 יצירת הפרויקט
-1. היכנס ל-Supabase → **New project**.
-2. בחר אזור **Frankfurt (eu-central-1)** — הכי קרוב.
-3. שמור את סיסמת בסיס הנתונים במקום בטוח.
+1. **Supabase → New project.** מ-Project Settings → API קח `Project URL`, `anon public`, `service_role`.
+   > ה-`Project URL` הוא הבסיס בלבד — `https://xxxx.supabase.co`, **בלי** `/rest/v1/`.
+2. **SQL Editor → New query** → הדבק את כל `supabase/setup.sql` → **Run**.
+   קובץ אחד שמכיל את כל המיגרציות והנתונים ההתחלתיים, ורץ כטרנזקציה אחת.
+3. **Database → Extensions** → הפעל `pg_cron` ו-`pg_net`.
+4. **Vercel → Import** את הריפו, **Root Directory = `app`**, והוסף את משתני הסביבה מסעיף 3.
+5. אחרי הפרסום — הרץ ב-SQL Editor את פקודת ה-`cron.schedule` שבתחתית
+   `supabase/migrations/*_automations.sql`, עם כתובת האתר וה-`CRON_SECRET` שלך.
 
-### 2.2 העלאת הסכמה
-מתוך תיקיית `app/`:
+---
 
-```bash
-supabase login
-supabase link --project-ref <PROJECT-REF>     # ה-REF מופיע בכתובת הדשבורד
-supabase db push                               # מריץ את כל הקבצים ב-supabase/migrations
-```
+## 3. משתני סביבה
 
-ואז את נתוני הפתיחה — בדשבורד, **SQL Editor**, הדבק את התוכן של `supabase/seed.sql` והרץ.
+ב-Vercel: **Settings → Environment Variables**. מקומית: `cp .env.local.example .env.local`.
 
-זה יוצר: ההגדרות, שני הצוותים, עשרת נושאי האימון עם הוראות הבטיחות, מאגרי הציוד/הרכבים/הנשק — ו**שני אנשים בלבד**:
-
-| שם | מספר אישי | תפקיד |
+| משתנה | סוד? | מה זה |
 |---|---|---|
-| רס״ן מתן זזון | `8409505` | מנהל מערכת |
-| סרן ישראל קדוש | `7387250` | מפקד החפ״ק |
+| `NEXT_PUBLIC_SUPABASE_URL` | לא | כתובת הפרויקט |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | לא | מפתח הדפדפן |
+| `SUPABASE_SERVICE_ROLE_KEY` | **כן** | קורא `pin_hash` ומנפיק סשנים |
+| `PIN_PEPPER` | **כן** | מגן על קודי הכניסה. ⚠️ אין לשנות אחרי שנבחרו קודים |
+| `AUTH_DERIVE_SECRET` | **כן** | ממנו נגזרת סיסמת ה-Auth |
+| `CRON_SECRET` | **כן** | מוכיח שהקורא ל-`/api/cron` הוא המתזמן |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | לא | רשות — פוש |
+| `VAPID_PRIVATE_KEY` | **כן** | רשות — פוש |
 
-**אין אימונים ואין נתוני דמו.** את הלוחמים ואת סבב האימונים מזינים מתוך המערכת.
-
-### 2.3 הסודות של פונקציות הכניסה
-בדשבורד: **Edge Functions → Secrets**. הוסף:
-
-```
-PIN_PEPPER          = <מחרוזת אקראית ארוכה>
-AUTH_DERIVE_SECRET  = <מחרוזת אקראית ארוכה אחרת>
-SITE_URL            = https://<הכתובת של האתר>
-```
-
-ליצירת מחרוזות אקראיות:
-
-```bash
-openssl rand -base64 48
-```
-
-> **חשוב**: `PIN_PEPPER` הוא מה שמגן על קודי הכניסה אם מישהו משיג עותק של בסיס הנתונים. אל תשנה אותו אחרי שלוחמים כבר בחרו קודים — כל הקודים יפסיקו לעבוד ויהיה צריך לאפס את כולם.
-
-### 2.4 העלאת הפונקציות
-
-```bash
-supabase functions deploy auth-login
-supabase functions deploy auth-set-pin
-supabase functions deploy run-automations
-```
+לסודות אין קידומת `NEXT_PUBLIC_`, ולכן Next.js לא אורז אותם לצד הלקוח.
 
 ---
 
-## 3. הרצה מקומית
+## 4. הרצה מקומית (למפתחים בלבד)
 
 ```bash
 cd app
 npm install
-cp .env.local.example .env.local     # ומלא את שני המפתחות מ-Settings → API
+cp .env.local.example .env.local     # ומלא
 npm run dev                          # http://localhost:3000
 ```
 
-הכניסה הראשונה: מספר אישי `8409505` → בחירת קוד בן 4 ספרות (לא `1234`, לא ספרה חוזרת) → אימות → נכנסת.
+כניסה ראשונה: מספר אישי `8409505` → בחירת קוד 4 ספרות.
 
 ---
 
-## 4. פרסום (Vercel)
+## 5. התזכורות
 
-1. דחוף את הקוד ל-GitHub.
-2. ב-Vercel → **Import Project** → בחר את הריפו → **Root Directory: `app`**.
-3. הוסף את משתני הסביבה מ-`.env.local` (בלי הסודות של Supabase — הם חיים רק שם).
-4. **Deploy**. הכתובת שתקבל היא מה שמכניסים ל-`SITE_URL` בסעיף 2.3.
+`/api/cron` מבצע פעם בכל הרצה:
 
-### התקנה בטלפון
-- **אנדרואיד (Chrome)**: תפריט ⋮ → *התקן אפליקציה*.
-- **אייפון (Safari)**: שיתוף → *הוסף למסך הבית*.
+- תזכורת ערב לפני, בשעה שנקבעה בהגדרות (18:00)
+- תזכורת שעתיים לפני היציאה
+- "ממתין לסיכום" יום אחרי אימון שעבר
+- הזמנה ללא מענה מעל 48 שעות
+- הסמכה שפוקעת בתוך 30 יום
 
-מרגע ההתקנה זו אפליקציה לכל דבר: אייקון, מסך מלא, וסרגל חמש לשוניות למטה — לו״ז · האימון שלי · צ׳אט · הצוות · פרופיל.
+כל אירוע נשלח **פעם אחת** — המפתח הראשי של `reminders_sent` הוא מה שמבטיח זאת.
+באותו מעבר נשלח גם Web Push לכל התראה שטרם נשלחה, לפי העדפות ההתראות של כל אדם.
 
----
-
-## 5. הפעלת האוטומציות (תזכורות)
-
-התזכורות רצות כל 10 דקות בצד השרת. ב-**SQL Editor** הרץ פעם אחת, עם הערכים שלך:
-
-```sql
-select cron.schedule(
-  'hapak-automations',
-  '*/10 * * * *',
-  $$
-  select net.http_post(
-    url     := 'https://<PROJECT-REF>.supabase.co/functions/v1/run-automations',
-    headers := jsonb_build_object(
-                 'Content-Type', 'application/json',
-                 'Authorization', 'Bearer <SERVICE_ROLE_KEY>'),
-    body    := '{}'::jsonb
-  );
-  $$
-);
-```
-
-מה זה שולח:
-- **ערב לפני, 18:00** — תזכורת עם שעת היציאה ונקודת האיסוף.
-- **שעתיים לפני היציאה** — תזכורת בוקר.
-- **יום אחרי אימון שעבר** — ״ממתין לסיכום״ למפקדים.
-- **הזמנה ללא מענה מעל 48 שעות** — התרעה למפקד עם הצעת מחליף.
-- **הסמכה שפוקעת ב-30 הימים הקרובים** — ללוחם ולמנהלים.
-
-כל התרעה נשלחת **פעם אחת בלבד** (טבלת `reminders_sent`).
-
-### התראות פוש לטלפון (רשות)
-
-```bash
-npx web-push generate-vapid-keys
-```
-
-- ה-**public key** → `NEXT_PUBLIC_VAPID_PUBLIC_KEY` ב-Vercel.
-- ה-**private key** → `VAPID_PRIVATE_KEY` בסודות של Supabase, יחד עם `VAPID_PUBLIC_KEY` ו-`VAPID_SUBJECT`.
-
-כל לוחם מפעיל את ההתראות פעם אחת בכל מכשיר, מתוך **פרופיל → הגדרות התראות**.
+לפוש: `npx web-push generate-vapid-keys` → ה-public ל-`NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
+ה-private ל-`VAPID_PRIVATE_KEY`. בלעדיהם ההתראות בתוך האפליקציה עובדות כרגיל.
 
 ---
 
@@ -168,15 +117,20 @@ app/
 │   │   │   ├── manage/           ניהול התקופה (מנהל / מפקד חפ״ק)
 │   │   │   ├── my/  chat/        מסכי הטלפון
 │   │   │   └── logistics/ calendar/ archive/ profile/
-│   │   └── api/weather/          מזג אוויר לפי נצ״ד (רשת ישראל → WGS84)
+│   │   └── api/                  לוגיקת השרת
+│   │       ├── auth/login/       מספר אישי → שלב הקוד
+│   │       ├── auth/set-pin/     בחירת קוד בכניסה הראשונה
+│   │       ├── cron/             התזכורות (נקרא מ-pg_cron)
+│   │       └── weather/          מזג אוויר לפי נצ״ד (רשת ישראל → WGS84)
 │   ├── components/               רכיבים משותפים ודיאלוגים
 │   └── lib/
 │       ├── core/                 ← כל הכללים העסקיים
 │       ├── data/                 טעינה, מוטציות, Realtime
-│       └── supabase/             חיבור
+│       ├── server/               סודות: גיבוב הקוד, לקוח service-role
+│       └── supabase/             חיבור מהדפדפן
 └── supabase/
-    ├── migrations/               סכמה, RLS, פונקציות, אוטומציות
-    ├── functions/                Edge Functions (כניסה + תזכורות)
+    ├── setup.sql                 ← הכול בקובץ אחד, להדבקה בדפדפן
+    ├── migrations/               אותו תוכן מפוצל, ל-`supabase db push`
     └── seed.sql                  מצב פתיחה נקי
 ```
 
@@ -220,7 +174,7 @@ npm run db:reset    # איפוס בסיס נתונים מקומי + seed
 
 | נושא | מצב |
 |---|---|
-| **יומן Google של המח״ט** | האירועים מוזנים ידנית (מנהל / מפקד חפ״ק). סנכרון קריאה-בלבד מ-Google הוא שלב הבא — Edge Function מתוזמנת שמכניסה אירועים עם `source='google'`. |
+| **יומן Google של המח״ט** | האירועים מוזנים ידנית (מנהל / מפקד חפ״ק). סנכרון קריאה-בלבד מ-Google הוא שלב הבא — הרחבה של `/api/cron` שמכניסה אירועים עם `source='google'`. |
 | **מזג אוויר** | מחובר ל-Open-Meteo לפי הנצ״ד. אם ההמרה או השירות נכשלים המסך מציג הערכה מקומית, ומסומן בפירוש ״הערכה בלבד״. זריחה ושקיעה מחושבים תמיד. |
 | **קבצים בצ׳אט** | שם הקובץ נשמר עם ההודעה. תמונות הסיכום ופקודות האימון עולות ל-Storage; העלאת קובצי צ׳אט ל-Storage היא הרחבה קטנה על אותה תשתית. |
 
@@ -228,12 +182,15 @@ npm run db:reset    # איפוס בסיס נתונים מקומי + seed
 
 ## 11. תקלות נפוצות
 
-**״חסרה הגדרת Supabase״** — `.env.local` לא מולא, או שהשרת לא הופעל מחדש אחרי המילוי.
+**״חסרה הגדרת Supabase״** — `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` חסרים. שים לב שה-URL הוא הבסיס בלבד, **בלי** `/rest/v1/`.
 
-**נכנסים ומיד חוזרים למסך הכניסה** — הסודות `PIN_PEPPER` / `AUTH_DERIVE_SECRET` לא מוגדרים ב-Edge Functions, או שהפונקציות לא הועלו (סעיף 2.4).
+**נכנסים ומיד חוזרים למסך הכניסה** — `PIN_PEPPER`, `AUTH_DERIVE_SECRET` או `SUPABASE_SERVICE_ROLE_KEY` חסרים בין משתני הסביבה. הוסף ב-Vercel והרץ Redeploy.
 
 **״המספר האישי לא רשום״ למי שכן הוספת** — בדוק שהמספר הוא בדיוק 7 ספרות ושהלוחם בסטטוס ״פעיל״.
 
 **שינוי במכשיר אחד לא מופיע באחר** — Realtime לא מופעל לטבלה. בדשבורד: **Database → Replication** ← ודא שהטבלאות מהמיגרציה `0001` נמצאות בפרסום `supabase_realtime`.
 
-**התזכורות לא נשלחות** — הרץ `select * from cron.job;` ובדוק שה-Routine קיים; ואז `select * from reminders_sent order by sent_at desc limit 10;` כדי לראות מה כבר נשלח.
+**התזכורות לא נשלחות** — `select * from cron.job;` (קיים ופעיל?), ואז
+`select * from cron.job_run_details order by start_time desc limit 5;` לראות מה קרה בהרצה,
+ו-`select * from reminders_sent order by sent_at desc limit 10;` לראות מה כבר נשלח.
+`401` בתשובה = ה-`CRON_SECRET` בפקודת ה-cron לא זהה לזה שב-Vercel.

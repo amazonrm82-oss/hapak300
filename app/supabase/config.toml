@@ -31,14 +31,3 @@ enable_confirmations = false
 [auth.email]
 enable_signup = false
 enable_confirmations = false
-
-# The login functions are called before anyone has a session, so they are
-# reached with the anon key — which is itself a valid JWT, so verification stays on.
-[functions.auth-login]
-verify_jwt = true
-
-[functions.auth-set-pin]
-verify_jwt = true
-
-[functions.run-automations]
-verify_jwt = true

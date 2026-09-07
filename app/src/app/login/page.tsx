@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { JoinRequestDialog } from '@/components/JoinRequestDialog';
 import { Field } from '@/components/ui/bits';
 import { useApp } from '@/lib/data/provider';
-import { callFunction, supabase } from '@/lib/supabase/client';
+import { callServer, supabase } from '@/lib/supabase/client';
 
 type Stage = 'pn' | 'pin' | 'set-pin';
 
@@ -57,21 +57,21 @@ export default function LoginPage() {
     try {
       if (stage === 'pn') {
         if (!/^\d{7}$/.test(pn)) throw new Error('מספר אישי חייב להיות 7 ספרות');
-        const r = await callFunction<LoginResponse>('auth-login', { pn });
+        const r = await callServer<LoginResponse>('/api/auth/login', { pn });
         setWho(r.name ?? '');
         setStage(r.stage === 'set-pin' ? 'set-pin' : 'pin');
         return;
       }
 
       if (stage === 'set-pin') {
-        const r = await callFunction<LoginResponse>('auth-set-pin', { pn, pin, pin2 });
+        const r = await callServer<LoginResponse>('/api/auth/set-pin', { pn, pin, pin2 });
         await applySession(r);
         toast('הקוד נשמר — בכניסה הבאה תקליד מספר אישי וקוד');
         return;
       }
 
       if (!/^\d{4}$/.test(pin)) throw new Error('הקוד חייב להיות 4 ספרות');
-      const r = await callFunction<LoginResponse>('auth-login', { pn, pin });
+      const r = await callServer<LoginResponse>('/api/auth/login', { pn, pin });
       if (r.stage === 'set-pin') {
         setStage('set-pin');
         return;

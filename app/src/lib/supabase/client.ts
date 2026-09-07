@@ -30,21 +30,18 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
-export const functionsUrl = (name: string) =>
-  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${name}`;
-
-/** Calls an Edge Function with the anon key; used by the login screens. */
-export async function callFunction<T>(name: string, body: unknown): Promise<T> {
-  const res = await fetch(functionsUrl(name), {
+/**
+ * Calls one of this app's own server routes. The login flow lives there rather
+ * than in the browser because it needs the service-role key to read `pin_hash`
+ * — the code and the hash never reach the client.
+ */
+export async function callServer<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({ error: 'שגיאת רשת' }));
+  const data = await res.json().catch(() => ({ error: 'שגיאת רשת — בדוק את החיבור' }));
   if (!res.ok) throw new Error(data.error || 'הפעולה נכשלה');
   return data as T;
 }

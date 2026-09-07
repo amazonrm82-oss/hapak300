@@ -1,5 +1,11 @@
+import { NextResponse } from 'next/server';
+import webpush from 'web-push';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { admin } from '@/lib/server/admin';
+
 /**
- * Runs every 10 minutes (pg_cron → this function).
+ * The reminders, run on a schedule (pg_cron in Supabase calls this route every
+ * ten minutes — see supabase/setup.sql).
  *
  * A direct port of `runAutomations` from the prototype's hapak-core.js:
  *   · evening reminder the day before, at the configured hour (18:00)
@@ -8,56 +14,76 @@
  *   · an invitation with no answer past the 48-hour window
  *   · a personal certification expiring within 30 days
  *
- * Each fires exactly once — `reminders_sent` holds one row per event. The same
- * pass then delivers Web Push for any notification not yet pushed, honouring
- * each person's notification preferences.
+ * Each fires exactly once — `reminders_sent` holds one row per event, and its
+ * primary key is what actually guarantees it. The same pass then delivers Web
+ * Push for anything not yet pushed, honouring each person's preferences.
  */
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import webpush from 'https://esm.sh/web-push@3.6.7';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const TZ = 'Asia/Jerusalem';
 
-Deno.serve(async () => {
-  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false },
-  });
+export async function POST(request: Request) {
+  return run(request);
+}
 
-  const today = fmtDate(new Date());
-  const now = fmtTime(new Date());
+export async function GET(request: Request) {
+  return run(request);
+}
 
-  const created = await createReminders(db, today, now);
+async function run(request: Request) {
+  // the caller is a scheduler, not a person: a shared secret is the whole check
+  const secret = process.env.CRON_SECRET;
+  if (!secret)
+    return NextResponse.json({ error: 'CRON_SECRET is not configured' }, { status: 500 });
+
+  const auth = request.headers.get('authorization') ?? '';
+  const provided = auth.replace(/^Bearer\s+/i, '').trim();
+  if (provided !== secret) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const db = admin();
+  const now = new Date();
+  const today = fmtDate(now);
+  const clock = fmtTime(now);
+
+  const created = await createReminders(db, today, clock);
   const pushed = await deliverPush(db);
 
-  return new Response(JSON.stringify({ ok: true, today, now, created, pushed }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
-});
+  return NextResponse.json({ ok: true, today, now: clock, created, pushed });
+}
 
 // ── reminders ──────────────────────────────────────────────────────────────
 
+interface Queued {
+  key: string;
+  text: string;
+  to: string[];
+  tid: string | null;
+  kind: string;
+}
+
 async function createReminders(db: SupabaseClient, today: string, now: string): Promise<number> {
-  const { data: settings } = await db.from('settings').select('*').single();
+  const { data: settings } = await db.from('settings').select('*').maybeSingle();
   if (!settings) return 0;
 
   const { data: sentRows } = await db.from('reminders_sent').select('key');
   const sent = new Set((sentRows ?? []).map((r: { key: string }) => r.key));
 
-  const { data: people } = await db.from('people').select('*').eq('status', 'active');
-  const { data: teams } = await db.from('teams').select('*');
-  const { data: topics } = await db.from('topics').select('id, name');
-  const { data: trainings } = await db
-    .from('trainings_view')
-    .select('*')
-    .not('status', 'in', '(cancelled,done)');
+  const [{ data: people }, { data: teams }, { data: topics }, { data: trainings }] =
+    await Promise.all([
+      db.from('people').select('*').eq('status', 'active'),
+      db.from('teams').select('*'),
+      db.from('topics').select('id, name'),
+      db.from('trainings_view').select('*').not('status', 'in', '(cancelled,done)'),
+    ]);
 
   const roster = people ?? [];
   const topicName = (id: string) => topics?.find((t) => t.id === id)?.name ?? '';
   const leaders = roster.filter((p) => p.is_admin || p.is_hapak_commander).map((p) => p.id);
 
   const participantsOf = (t: Record<string, unknown>) =>
-    roster
-      .filter((p) => p.team_id && (t.team_id === 'joint' || p.team_id === t.team_id))
-      .map((p) => p.id);
+    roster.filter((p) => p.team_id && (t.team_id === 'joint' || p.team_id === t.team_id)).map((p) => p.id);
 
   const leadersOf = (t: Record<string, unknown>) => {
     const teamCmd = teams?.find((x) => x.id === t.team_id)?.commander_id;
@@ -65,14 +91,19 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
   };
 
   const tomorrow = addDays(today, 1);
-  const queue: { key: string; text: string; to: string[]; tid: string | null; kind: string }[] = [];
+  const queue: Queued[] = [];
 
   for (const t of trainings ?? []) {
-    const ids = [...new Set([...participantsOf(t), t.instructor_id, t.commander_id].filter(Boolean))] as string[];
+    const ids = [
+      ...new Set([...participantsOf(t), t.instructor_id, t.commander_id].filter(Boolean)),
+    ] as string[];
     const label = `${t.team_id === 'joint' ? 'משותף' : `אימון ${pad(t.seq)}`} · ${topicName(t.topic_id)}`;
 
-    // evening before, from the configured hour
-    if (t.date === tomorrow && now >= (settings.evening_reminder || '18:00') && !sent.has(`${t.id}:eve`))
+    if (
+      t.date === tomorrow &&
+      now >= (settings.evening_reminder || '18:00') &&
+      !sent.has(`${t.id}:eve`)
+    )
       queue.push({
         key: `${t.id}:eve`,
         text: `תזכורת: מחר ${label} · יציאה ${t.departure} מ${t.pickup} · ${t.location}`,
@@ -81,7 +112,6 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
         kind: 'evening',
       });
 
-    // two hours before the departure, on the day itself
     const morningFrom = addMinutes(t.departure, -(settings.morning_reminder_before || 120));
     if (t.date === today && now >= morningFrom && now < t.departure && !sent.has(`${t.id}:morn`))
       queue.push({
@@ -92,7 +122,6 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
         kind: 'morning',
       });
 
-    // the training has passed without a summary
     if (t.date < today && !sent.has(`${t.id}:sum`))
       queue.push({
         key: `${t.id}:sum`,
@@ -102,7 +131,6 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
         kind: 'general',
       });
 
-    // an invitation with no answer past the window
     const hours = settings.invite_hours || 48;
     for (const role of ['instructor', 'commander'] as const) {
       const status = role === 'instructor' ? t.inst_status : t.cmd_status;
@@ -122,7 +150,6 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
     }
   }
 
-  // certifications expiring, or already expired
   const CERTS: [string, string][] = [
     ['fire', 'ירי (מטווח שנתי)'],
     ['drive', 'נהיגה מבצעית'],
@@ -151,27 +178,30 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
     }
   }
 
+  let created = 0;
   for (const item of queue) {
-    // the primary key on reminders_sent is what actually guarantees "once"
     const { error } = await db.from('reminders_sent').insert({ key: item.key });
-    if (error) continue; // already sent by a concurrent run
+    if (error) continue; // a concurrent run already claimed it
     await db
       .from('notifications')
       .insert({ text: item.text, to: item.to, training_id: item.tid, kind: item.kind });
+    created++;
   }
-
-  return queue.length;
+  return created;
 }
 
 // ── web push ───────────────────────────────────────────────────────────────
 
 async function deliverPush(db: SupabaseClient): Promise<number> {
-  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-  const privateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-  const subject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@hapak300.local';
-  if (!publicKey || !privateKey) return 0;
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) return 0; // push is optional
 
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT ?? 'mailto:admin@hapak300.local',
+    publicKey,
+    privateKey,
+  );
 
   const { data: pending } = await db
     .from('notifications')
@@ -179,20 +209,19 @@ async function deliverPush(db: SupabaseClient): Promise<number> {
     .is('pushed_at', null)
     .order('time', { ascending: true })
     .limit(100);
-
   if (!pending?.length) return 0;
 
-  const { data: subs } = await db.from('push_subscriptions').select('*');
-  const { data: people } = await db.from('people').select('id, notif');
+  const [{ data: subs }, { data: people }] = await Promise.all([
+    db.from('push_subscriptions').select('*'),
+    db.from('people').select('id, notif'),
+  ]);
   const prefs = new Map((people ?? []).map((p) => [p.id, p.notif ?? {}]));
 
   let sent = 0;
-
   for (const n of pending) {
     const recipients: string[] = n.to ?? (people ?? []).map((p) => p.id);
 
     for (const personId of recipients) {
-      // the recipient's own preference decides whether this kind reaches them
       const pref = prefs.get(personId) ?? {};
       if (n.kind === 'evening' && pref.evening === false) continue;
       if (n.kind === 'morning' && pref.morning === false) continue;
@@ -222,7 +251,6 @@ async function deliverPush(db: SupabaseClient): Promise<number> {
 
     await db.from('notifications').update({ pushed_at: new Date().toISOString() }).eq('id', n.id);
   }
-
   return sent;
 }
 
@@ -231,10 +259,20 @@ async function deliverPush(db: SupabaseClient): Promise<number> {
 const pad = (n: number | string) => String(n).padStart(2, '0');
 
 const fmtDate = (d: Date) =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
 
 const fmtTime = (d: Date) =>
-  new Intl.DateTimeFormat('he-IL', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  new Intl.DateTimeFormat('he-IL', {
+    timeZone: TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d);
 
 function addDays(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -243,7 +281,9 @@ function addDays(iso: string, n: number): string {
 }
 
 function daysBetween(a: string, b: string): number {
-  return Math.round((new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / 86400000);
+  return Math.round(
+    (new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / 86400000,
+  );
 }
 
 function addMinutes(hhmm: string, mins: number): string {

@@ -26,24 +26,27 @@ exception when others then
 end $$;
 
 /*
-  Scheduling the job needs the project URL and the service-role key, which must
-  not be written into a migration. Run this once from the SQL editor, with your
-  own values substituted — see README.md, "הפעלת האוטומציות":
+  ── הפעלת התזכורות ────────────────────────────────────────────────────────
+
+  הרץ את זה פעם אחת ב-SQL Editor, אחרי שהאתר פורסם ב-Vercel, כשאתה מחליף:
+    <SITE>         כתובת האתר, למשל  https://hapak300.vercel.app
+    <CRON_SECRET>  אותה מחרוזת בדיוק שהגדרת ב-Vercel תחת CRON_SECRET
 
     select cron.schedule(
       'hapak-automations',
       '*/10 * * * *',
       $$
       select net.http_post(
-        url     := 'https://<PROJECT-REF>.supabase.co/functions/v1/run-automations',
+        url     := '<SITE>/api/cron',
         headers := jsonb_build_object(
                      'Content-Type', 'application/json',
-                     'Authorization', 'Bearer <SERVICE_ROLE_KEY>'),
+                     'Authorization', 'Bearer <CRON_SECRET>'),
         body    := '{}'::jsonb
       );
       $$
     );
 
-  To stop it:  select cron.unschedule('hapak-automations');
-  To inspect:  select * from cron.job;
+  לבדיקה:      select jobname, schedule, active from cron.job;
+  לעצירה:      select cron.unschedule('hapak-automations');
+  מה כבר נשלח: select * from reminders_sent order by sent_at desc limit 20;
 */
