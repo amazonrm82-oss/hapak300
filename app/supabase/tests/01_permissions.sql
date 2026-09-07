@@ -292,3 +292,33 @@ exception when others then
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ JOIN REQUESTS REACH THE LEADERSHIP ════════
+-- Submitted from the login screen with no session at all, so the notification
+-- is the database's job, not the browser's.
+reset role; reset request.jwt.claim.sub;
+
+insert into join_requests (name, rank, role, pn, phone, team_id)
+values ('אורי בקשה', 'סמל', 'נגביסט', '7999999', '052-7777777', 'b');
+
+select case when exists (
+  select 1 from notifications n
+   where n.text like 'בקשת הצטרפות חדשה%'
+     and (select id from people where pn = '8409505') = any(n."to")
+) then '✅' else '❌' end || '  43  בקשת הצטרפות מתריעה למנהל המערכת';
+
+select case when exists (
+  select 1 from notifications n
+   where n.text like 'בקשת הצטרפות חדשה%'
+     and (select id from people where pn = '7387250') = any(n."to")
+) then '✅' else '❌' end || '  44  ובמקביל למפקד החפ״ק';
+
+select case when not exists (
+  select 1 from notifications n
+   where n.text like 'בקשת הצטרפות חדשה%'
+     and (select id from people where pn = '7480932') = any(n."to")
+) then '✅' else '❌' end || '  45  לוחם רגיל אינו מקבל את ההתראה';
+
+select case when (select n.text from notifications n where n.text like 'בקשת הצטרפות חדשה%' limit 1)
+              like '%אורי בקשה%7999999%'
+            then '✅' else '❌' end || '  46  ההתראה נושאת שם, תפקיד ומספר אישי';

@@ -19,6 +19,9 @@
 --  4. תיקון הכניסה — הקוד בן 4 הספרות לא נשמר בכלל, ולכן כל כניסה נראתה
 --     ככניסה ראשונה וביקשה לבחור קוד מחדש. אחרי העדכון הקוד נשמר, ובכניסה
 --     הבאה נדרשים רק מספר אישי + הקוד שנבחר.
+--
+--  5. בקשת הצטרפות — מעכשיו קופצת כהתראה למנהל המערכת ולמפקד החפ״ק ברגע
+--     שהיא נשלחת, ולא רק מחכה במסך ״צוותים״.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -324,3 +327,34 @@ end $$;
 -- לבדיקה: אחרי הרצת העדכון, היכנס פעם אחת ובחר קוד — ובכניסה הבאה המערכת
 -- תבקש רק את הקוד. אפשר גם לוודא ישירות:
 --   select name, pin_hash is not null as has_pin from people;
+
+
+-- ── 5. התראה על בקשת הצטרפות ──────────────────────────────────────────────
+
+-- ── a join request reaches a person ────────────────────────────────────────
+-- The request is submitted from the login screen, by someone with no account
+-- and no session, so the notification cannot come from the browser: an
+-- anonymous client may insert the request and nothing else. The database
+-- raises it instead, addressed to the administrators and the HQ-party
+-- commander — the only people who can approve it.
+create or replace function notify_join_request() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare leaders uuid[];
+begin
+  if new.status <> 'pending' then return new; end if;
+
+  select array_remove(array_agg(id), null) into leaders
+    from people where (is_admin or is_hapak_commander) and status = 'active';
+  if array_length(leaders, 1) is null then return new; end if;
+
+  perform notify(
+    format('בקשת הצטרפות חדשה: %s %s · %s · מ.א. %s · %s — לאישור במסך ״צוותים״.',
+           new.rank, new.name, new.role, new.pn,
+           coalesce((select name from teams where id = new.team_id), '')),
+    leaders, null, 'general');
+  return new;
+end $$;
+
+drop trigger if exists join_requests_notify on join_requests;
+create trigger join_requests_notify after insert on join_requests
+  for each row execute function notify_join_request();
