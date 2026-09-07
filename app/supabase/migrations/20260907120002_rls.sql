@@ -225,8 +225,22 @@ from people p;
 revoke select on people from authenticated, anon;
 grant select on people_view to authenticated;
 grant select on trainings_view to authenticated;
--- writes still go to the table, and are governed by the policies above
+
+-- Writes still go to the table and are governed by the policies above. They
+-- also need column-level SELECT: `update … where id = ?` reads `id` to find the
+-- row, and without it Postgres refuses the statement outright — so an
+-- administrator could add a fighter but never edit or remove one.
+--
+-- Everything readable through `people_view` anyway is granted here; the three
+-- columns left out are the ones that must not be reachable by a hand-written
+-- API call: `pn` (commanders only, and the view decides that per viewer),
+-- `pin_hash`, and `auth_id`.
 grant insert, update, delete on people to authenticated;
+grant select (
+  id, team_id, rank, name, role, phone, status, status_note, rating, qual,
+  is_team_commander, is_instructor, is_admin, is_hapak_commander,
+  certs, notif, pin_set_at, created_at, updated_at
+) on people to authenticated;
 
 -- ── topics and catalogs ────────────────────────────────────────────────────
 create policy topics_read on topics for select to authenticated using (true);

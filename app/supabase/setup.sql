@@ -22,6 +22,10 @@
 
 
 
+
+
+
+
 -- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  טבלאות
 -- ╚══════════════════════════════════════════════════════════════════════╝
@@ -633,8 +637,22 @@ from people p;
 revoke select on people from authenticated, anon;
 grant select on people_view to authenticated;
 grant select on trainings_view to authenticated;
--- writes still go to the table, and are governed by the policies above
+
+-- Writes still go to the table and are governed by the policies above. They
+-- also need column-level SELECT: `update … where id = ?` reads `id` to find the
+-- row, and without it Postgres refuses the statement outright — so an
+-- administrator could add a fighter but never edit or remove one.
+--
+-- Everything readable through `people_view` anyway is granted here; the three
+-- columns left out are the ones that must not be reachable by a hand-written
+-- API call: `pn` (commanders only, and the view decides that per viewer),
+-- `pin_hash`, and `auth_id`.
 grant insert, update, delete on people to authenticated;
+grant select (
+  id, team_id, rank, name, role, phone, status, status_note, rating, qual,
+  is_team_commander, is_instructor, is_admin, is_hapak_commander,
+  certs, notif, pin_set_at, created_at, updated_at
+) on people to authenticated;
 
 -- ── topics and catalogs ────────────────────────────────────────────────────
 create policy topics_read on topics for select to authenticated using (true);
@@ -1333,31 +1351,33 @@ exception when others then
   raise notice 'pg_net לא הופעל מכאן — הפעל אותו מהדשבורד: Database → Extensions';
 end $$;
 
-/*
-  ── הפעלת התזכורות ────────────────────────────────────────────────────────
-
-  הרץ את זה פעם אחת ב-SQL Editor, אחרי שהאתר פורסם ב-Vercel, כשאתה מחליף:
-    <SITE>         כתובת האתר, למשל  https://hapak300.vercel.app
-    <CRON_SECRET>  אותה מחרוזת בדיוק שהגדרת ב-Vercel תחת CRON_SECRET
-
-    select cron.schedule(
-      'hapak-automations',
-      '*/10 * * * *',
-      $$
-      select net.http_post(
-        url     := '<SITE>/api/cron',
-        headers := jsonb_build_object(
-                     'Content-Type', 'application/json',
-                     'Authorization', 'Bearer <CRON_SECRET>'),
-        body    := '{}'::jsonb
-      );
-      $$
-    );
-
-  לבדיקה:      select jobname, schedule, active from cron.job;
-  לעצירה:      select cron.unschedule('hapak-automations');
-  מה כבר נשלח: select * from reminders_sent order by sent_at desc limit 20;
-*/
+-- ── הפעלת התזכורות ────────────────────────────────────────────────────────
+--
+-- Deliberately line comments, not a /* … */ block: the cron expression below
+-- contains the two characters that close a block comment, which would end it
+-- early and leave the rest of the schedule to be parsed as SQL.
+--
+-- הרץ את זה פעם אחת ב-SQL Editor, אחרי שהאתר פורסם ב-Vercel, כשאתה מחליף:
+--   <SITE>         כתובת האתר, למשל  https://hapak300.vercel.app
+--   <CRON_SECRET>  אותה מחרוזת בדיוק שהגדרת ב-Vercel תחת CRON_SECRET
+--
+--   select cron.schedule(
+--     'hapak-automations',
+--     '*/10 * * * *',
+--     $$
+--     select net.http_post(
+--       url     := '<SITE>/api/cron',
+--       headers := jsonb_build_object(
+--                    'Content-Type', 'application/json',
+--                    'Authorization', 'Bearer <CRON_SECRET>'),
+--       body    := '{}'::jsonb
+--     );
+--     $$
+--   );
+--
+-- לבדיקה:      select jobname, schedule, active from cron.job;
+-- לעצירה:      select cron.unschedule('hapak-automations');
+-- מה כבר נשלח: select * from reminders_sent order by sent_at desc limit 20;
 
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
