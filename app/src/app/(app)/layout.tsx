@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { AppHeader } from '@/components/shell/AppHeader';
+import { InstallBanner } from '@/components/shell/InstallBanner';
 import { InviteBanners } from '@/components/shell/InviteBanners';
 import { MobileTabs } from '@/components/shell/MobileTabs';
 import { useApp } from '@/lib/data/provider';
@@ -46,6 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AppHeader />
+      <InstallBanner />
       <InviteBanners />
       <main
         style={{

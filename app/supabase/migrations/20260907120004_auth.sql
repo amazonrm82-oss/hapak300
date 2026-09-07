@@ -20,6 +20,10 @@ begin
   if not is_admin() then
     raise exception 'איפוס קוד כניסה שמור למנהל המערכת ולמפקד החפ״ק';
   end if;
+  -- resetting a code is a way into the account, so the rank order holds here too
+  if not is_sysadmin() and (select is_admin from people where id = pid) then
+    raise exception 'רק מנהל מערכת יכול לאפס את קוד הכניסה של מנהל מערכת';
+  end if;
   update people set pin_hash = null, pin_set_at = null where id = pid;
   delete from login_attempts where pn = (select pn from people where id = pid);
 end $$;

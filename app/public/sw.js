@@ -7,8 +7,8 @@
  * Only the shell is pre-cached so the app opens and can say it needs a network.
  */
 
-const SHELL = 'hapak-shell-v1';
-const SHELL_FILES = ['/manifest.webmanifest', '/emblem.png'];
+const SHELL = 'hapak-shell-v2';
+const SHELL_FILES = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
@@ -42,8 +42,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: '/emblem.png',
-      badge: '/emblem.png',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       dir: 'rtl',
       lang: 'he',
       tag: payload.tag || undefined,

@@ -8,6 +8,7 @@ import type { Db, Person, Training } from './types';
  */
 export interface Perms {
   isAdmin: boolean;
+  isSysAdmin: boolean;
   isTeamCmd: boolean;
   isTrainCmd: boolean;
   isInstr: boolean;
@@ -47,6 +48,7 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
 
   return {
     isAdmin,
+    isSysAdmin: !!user?.is_admin,
     isTeamCmd,
     isTrainCmd,
     isInstr,
@@ -71,6 +73,18 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
     canPin: isAdmin || isTeamCmd || isTrainCmd,
     canSignAmmo: isAdmin || isTrainCmd,
   };
+}
+
+/**
+ * The system administrator outranks the HQ-party commander: an administrator may
+ * edit, demote or remove a commander, but not the other way round. Enforced in
+ * the database by `guard_admin_rank` — this is only what the buttons obey.
+ */
+export function canEditPerson(user: Person | null, target: Person): boolean {
+  if (!user) return false;
+  if (user.is_admin) return true;
+  if (!user.is_hapak_commander) return false;
+  return !target.is_admin || target.id === user.id;
 }
 
 export function roleLabel(db: Db, p: Person | null): string {

@@ -8,7 +8,14 @@ export const metadata: Metadata = {
   title: 'כשירות חפ״ק מח״ט 300',
   description: 'תוכנית האימונים של שני צוותי החפ״ק — לו״ז, נוכחות, מדריכים ומפקדי אימון, לוגיסטיקה ותחמושת.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/emblem.png', apple: '/emblem.png' },
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    // iOS ignores the manifest icons and takes this one to the Home Screen
+    apple: { url: '/apple-touch-icon.png', sizes: '180x180' },
+  },
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'כשירות חפ״ק' },
 };
 

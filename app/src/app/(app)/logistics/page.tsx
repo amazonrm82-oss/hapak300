@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { FleetCard } from '@/components/FleetCard';
 import { SectionCard, Tag } from '@/components/ui/bits';
 import { dayLetter, fmtShort } from '@/lib/core/dates';
 import { permsFor } from '@/lib/core/permissions';
@@ -110,6 +111,8 @@ export default function LogisticsPage() {
           אין אימונים קרובים — הלוגיסטיקה נוצרת אוטומטית לכל אימון חדש לפי הנושא.
         </span>
       )}
+
+      <FleetCard />
 
       <div className="hapak-catalogs">
         {catalogs.map(([key, title, list]) => (

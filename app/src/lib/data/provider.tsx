@@ -48,6 +48,7 @@ const WATCHED = [
   'feedback',
   'photos',
   'join_requests',
+  'fleet',
 ];
 
 export function DataProvider({ children }: { children: ReactNode }) {

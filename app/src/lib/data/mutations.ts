@@ -1,6 +1,14 @@
 import { DEFAULT_FREQ, DEFAULT_PICKUP, DEPARTURE_LEAD_MINUTES } from '@/lib/core/constants';
 import { addDays, addMinutes, sundayOf } from '@/lib/core/dates';
-import { defaultDayBlocks, defaultLogistics, generateRotation } from '@/lib/core/defaults';
+import {
+  defaultDayBlocks,
+  defaultLogistics,
+  generateRotation,
+  type NewAmmo,
+  type NewFood,
+  type NewGear,
+  type NewVehicle,
+} from '@/lib/core/defaults';
 import {
   activeTrainings,
   fullName,
@@ -15,6 +23,7 @@ import type {
   CalendarEvent,
   Db,
   Fitness,
+  FleetVehicle,
   InviteRole,
   Person,
   RotationConfig,
@@ -111,6 +120,11 @@ export interface TrainingForm {
   pickup: string;
   safety: string;
   notes: string;
+  /** Filled in on the create form; when absent the topic defaults are used. */
+  gear?: NewGear[];
+  vehicles?: NewVehicle[];
+  ammo?: NewAmmo[];
+  food?: NewFood[];
 }
 
 /** Every field the unit made mandatory when publishing a training. */
@@ -140,9 +154,21 @@ function draftFor(db: Db, o: {
   pickup?: string;
   notes?: string;
   status?: 'planned' | 'published';
+  gear?: NewGear[];
+  vehicles?: NewVehicle[];
+  ammo?: NewAmmo[];
+  food?: NewFood[];
 }) {
   const departure = addMinutes(o.start, -DEPARTURE_LEAD_MINUTES);
-  const logi = defaultLogistics(o.topic_id, o.team_id, o.start, db.people, o.location);
+  // What the commander filled in on the form wins; anything they left alone
+  // falls back to the proposal computed from the topic and the roster.
+  const defaults = defaultLogistics(o.topic_id, o.team_id, o.start, db.people, o.location);
+  const logi = {
+    gear: o.gear ?? defaults.gear,
+    vehicles: o.vehicles ?? defaults.vehicles,
+    ammo: o.ammo ?? defaults.ammo,
+    food: o.food ?? defaults.food,
+  };
   return {
     team_id: o.team_id,
     topic_id: o.topic_id,
@@ -805,6 +831,44 @@ export async function removeCatalogItem(
   name: string,
 ): Promise<void> {
   const { error } = await sb().from(table).delete().eq('name', name);
+  check(error);
+}
+
+// ── the vehicle fleet ──────────────────────────────────────────────────────
+// Entered once with its צ׳, then picked from a list. A training keeps a copy of
+// the row, so editing the fleet never rewrites what went out on a past date.
+
+export interface FleetForm {
+  tz: string;
+  type: string;
+  seats: number;
+  fitness: FleetVehicle['fitness'];
+  note: string;
+  active: boolean;
+}
+
+export async function saveFleetVehicle(f: FleetForm, id: string | null): Promise<void> {
+  const tz = f.tz.trim();
+  const type = f.type.trim();
+  if (!tz) throw new Error('נדרש מספר צ׳');
+  if (!type) throw new Error('נדרש סוג רכב');
+  const row = {
+    tz,
+    type,
+    seats: Number(f.seats) || 4,
+    fitness: f.fitness,
+    note: f.note.trim(),
+    active: f.active,
+  };
+  const { error } = id
+    ? await sb().from('fleet').update(row).eq('id', id)
+    : await sb().from('fleet').insert(row);
+  if (error?.code === '23505') throw new Error('מספר הצ׳ הזה כבר קיים בצי');
+  check(error);
+}
+
+export async function removeFleetVehicle(id: string): Promise<void> {
+  const { error } = await sb().from('fleet').delete().eq('id', id);
   check(error);
 }
 

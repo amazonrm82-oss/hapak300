@@ -15,17 +15,8 @@
 --  אין אימונים ואין נתוני דמו. את הלוחמים ואת הסבב מזינים מתוך המערכת.
 --
 --  (למפתחים: הקבצים ב-supabase/migrations/ הם אותו תוכן, מפוצל לפי מיגרציות,
---   לשימוש עם `supabase db push`. הקובץ הזה נוצר מהם.)
+--   לשימוש עם `supabase db push`. הקובץ הזה נוצר מהם על ידי build-setup.mjs.)
 -- ═══════════════════════════════════════════════════════════════════════════
-
-
-
-
-
-
-
-
-
 
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
@@ -259,6 +250,22 @@ create table vehicles (
 );
 create index vehicles_training_idx on vehicles (training_id);
 
+-- The unit's own vehicles, entered once with their צ׳ and picked from a list
+-- afterwards. A training's `vehicles` row stays a copy rather than a reference:
+-- the צ׳ that went out that day belongs in the record even if the vehicle is
+-- later sold, renumbered or scrapped.
+create table fleet (
+  id       uuid primary key default gen_random_uuid(),
+  tz       text not null unique,
+  type     text not null,
+  seats    int  not null default 6,
+  fitness  vehicle_fitness not null default 'כשיר',
+  note     text not null default '',
+  active   boolean not null default true,
+  sort     int  not null default 0,
+  created_at timestamptz not null default now()
+);
+
 alter table trainings add constraint trainings_evac_fk
   foreign key (evac_vehicle_id) references vehicles (id) on delete set null;
 
@@ -406,6 +413,7 @@ alter publication supabase_realtime add table day_blocks;
 alter publication supabase_realtime add table feedback;
 alter publication supabase_realtime add table photos;
 alter publication supabase_realtime add table join_requests;
+alter publication supabase_realtime add table fleet;
 
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
@@ -435,6 +443,16 @@ $$;
 create or replace function is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce((select is_admin or is_hapak_commander from people where auth_id = auth.uid()), false)
+$$;
+
+-- The system administrator alone. The two levels manage the same unit, but the
+-- administrator outranks the HQ-party commander: only an administrator appoints
+-- another administrator, or edits, demotes, removes one, or resets their code.
+-- Without this the "levels" would differ in name only — a commander could reset
+-- the administrator's code and walk into the account.
+create or replace function is_sysadmin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select is_admin from people where auth_id = auth.uid()), false)
 $$;
 
 create or replace function is_team_cmd() returns boolean
@@ -538,6 +556,7 @@ alter table notification_reads enable row level security;
 alter table join_requests      enable row level security;
 alter table reminders_sent     enable row level security;
 alter table push_subscriptions enable row level security;
+alter table fleet              enable row level security;
 
 -- ── settings ───────────────────────────────────────────────────────────────
 create policy settings_read on settings for select to authenticated using (true);
@@ -584,6 +603,42 @@ end $$;
 
 create trigger people_self_edit_guard before update on people
   for each row execute function guard_people_self_edit();
+
+-- The HQ-party commander manages the unit, but not the rank above them: they
+-- may not appoint an administrator (themselves included), and may not touch an
+-- administrator's row at all — no edit, no demotion, no removal, no code reset.
+-- An administrator may do all of it, in both directions.
+create or replace function guard_admin_rank() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  -- No end-user JWT means this is the server acting for itself — the login route
+  -- stamping `auth_id` onto the administrator's own row, say. Ordinary sessions
+  -- can never reach here without one: the policies grant writes to
+  -- `authenticated` alone.
+  if auth.uid() is null or is_sysadmin() then
+    if tg_op = 'DELETE' then return old; else return new; end if;
+  end if;
+
+  if tg_op = 'DELETE' then
+    if old.is_admin then
+      raise exception 'רק מנהל מערכת יכול להסיר מנהל מערכת';
+    end if;
+    return old;
+  end if;
+
+  if tg_op = 'UPDATE' and old.is_admin then
+    raise exception 'רק מנהל מערכת יכול לערוך מנהל מערכת';
+  end if;
+
+  if new.is_admin then
+    raise exception 'רק מנהל מערכת יכול למנות מנהל מערכת';
+  end if;
+
+  return new;
+end $$;
+
+create trigger people_admin_rank_guard before insert or update or delete on people
+  for each row execute function guard_admin_rank();
 
 -- The last administrator cannot be demoted or deleted — otherwise nobody can
 -- ever manage the system again.
@@ -672,6 +727,12 @@ begin
       tbl, tbl);
   end loop;
 end $$;
+
+-- ── the vehicle fleet ──────────────────────────────────────────────────────
+-- Everyone picks from it; commanders maintain it, like the other catalogs.
+create policy fleet_read on fleet for select to authenticated using (true);
+create policy fleet_write on fleet for all to authenticated
+  using (is_admin() or is_team_cmd()) with check (is_admin() or is_team_cmd());
 
 -- ── trainings ──────────────────────────────────────────────────────────────
 create policy trainings_read on trainings for select to authenticated using (true);
@@ -1053,12 +1114,12 @@ begin
   self := pid = actor;
   if role = 'instructor' then
     update trainings set instructor_id = pid,
-                         inst_status = case when self then 'accepted' else 'pending' end,
+                         inst_status = (case when self then 'accepted' else 'pending' end)::invite_status,
                          inst_invited_at = now()
      where id = tid;
   else
     update trainings set commander_id = pid,
-                         cmd_status = case when self then 'accepted' else 'pending' end,
+                         cmd_status = (case when self then 'accepted' else 'pending' end)::invite_status,
                          cmd_invited_at = now()
      where id = tid;
   end if;
@@ -1083,9 +1144,9 @@ begin
   if not coalesce(ok, false) then raise exception 'ההזמנה אינה שלך'; end if;
 
   if role = 'instructor' then
-    update trainings set inst_status = case when accept then 'accepted' else 'declined' end where id = tid;
+    update trainings set inst_status = (case when accept then 'accepted' else 'declined' end)::invite_status where id = tid;
   else
-    update trainings set cmd_status  = case when accept then 'accepted' else 'declined' end where id = tid;
+    update trainings set cmd_status  = (case when accept then 'accepted' else 'declined' end)::invite_status where id = tid;
   end if;
 
   select array_remove(array_agg(distinct x), null) into leaders from (
@@ -1156,10 +1217,12 @@ begin
 
     i := 0;
     for row_json in select * from jsonb_array_elements(coalesce(d->'vehicles','[]'::jsonb)) loop
-      insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
+      insert into vehicles (training_id, type, tz, driver_id, seats, departure, fitness, fault, sort)
       values (tid, row_json->>'type', coalesce(row_json->>'tz',''),
               nullif(row_json->>'driver_id','')::uuid, (row_json->>'seats')::int,
-              row_json->>'departure', i);
+              row_json->>'departure',
+              coalesce(nullif(row_json->>'fitness','')::vehicle_fitness, 'כשיר'),
+              coalesce(row_json->>'fault',''), i);
       i := i + 1;
     end loop;
 
@@ -1257,7 +1320,7 @@ begin
   select * into j from join_requests where id = jid;
   if not found then raise exception 'הבקשה לא נמצאה'; end if;
 
-  update join_requests set status = case when accept then 'approved' else 'rejected' end where id = jid;
+  update join_requests set status = (case when accept then 'approved' else 'rejected' end)::join_status where id = jid;
   if not accept then return null; end if;
 
   insert into people (team_id, rank, name, role, pn, phone, rating)
@@ -1304,6 +1367,10 @@ language plpgsql security definer set search_path = public as $$
 begin
   if not is_admin() then
     raise exception 'איפוס קוד כניסה שמור למנהל המערכת ולמפקד החפ״ק';
+  end if;
+  -- resetting a code is a way into the account, so the rank order holds here too
+  if not is_sysadmin() and (select is_admin from people where id = pid) then
+    raise exception 'רק מנהל מערכת יכול לאפס את קוד הכניסה של מנהל מערכת';
   end if;
   update people set pin_hash = null, pin_set_at = null where id = pid;
   delete from login_attempts where pn = (select pn from people where id = pid);

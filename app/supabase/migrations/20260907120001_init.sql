@@ -225,6 +225,22 @@ create table vehicles (
 );
 create index vehicles_training_idx on vehicles (training_id);
 
+-- The unit's own vehicles, entered once with their צ׳ and picked from a list
+-- afterwards. A training's `vehicles` row stays a copy rather than a reference:
+-- the צ׳ that went out that day belongs in the record even if the vehicle is
+-- later sold, renumbered or scrapped.
+create table fleet (
+  id       uuid primary key default gen_random_uuid(),
+  tz       text not null unique,
+  type     text not null,
+  seats    int  not null default 6,
+  fitness  vehicle_fitness not null default 'כשיר',
+  note     text not null default '',
+  active   boolean not null default true,
+  sort     int  not null default 0,
+  created_at timestamptz not null default now()
+);
+
 alter table trainings add constraint trainings_evac_fk
   foreign key (evac_vehicle_id) references vehicles (id) on delete set null;
 
@@ -372,3 +388,4 @@ alter publication supabase_realtime add table day_blocks;
 alter publication supabase_realtime add table feedback;
 alter publication supabase_realtime add table photos;
 alter publication supabase_realtime add table join_requests;
+alter publication supabase_realtime add table fleet;

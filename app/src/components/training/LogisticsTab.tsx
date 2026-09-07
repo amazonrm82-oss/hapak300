@@ -6,7 +6,7 @@ import { Field } from '@/components/ui/bits';
 import { FITNESS_OPTIONS, FOOD_CATALOG } from '@/lib/core/constants';
 import { permsFor } from '@/lib/core/permissions';
 import { fullName, participants, personById } from '@/lib/core/selectors';
-import type { GearItem, TrainingFull } from '@/lib/core/types';
+import type { FleetVehicle, GearItem, TrainingFull } from '@/lib/core/types';
 import {
   addAmmo,
   addFood,
@@ -77,7 +77,7 @@ export function LogisticsTab({ training: t }: { training: TrainingFull }) {
         />
       )}
       {sub === 'vehicles' && (
-        <VehiclesSection t={t} canEdit={canEdit} run={run} people={ps} types={db.vehicle_types} />
+        <VehiclesSection t={t} canEdit={canEdit} run={run} people={ps} types={db.vehicle_types} fleet={db.fleet} />
       )}
       {sub === 'ammo' && (
         <AmmoSection t={t} canEdit={canEdit} canSign={perms.canSignAmmo} canEnterUsed={perms.canSummarize} run={run} weapons={db.weapons} />
@@ -250,12 +250,14 @@ function VehiclesSection({
   run,
   people,
   types,
+  fleet,
 }: {
   t: TrainingFull;
   canEdit: boolean;
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
   people: ReturnType<typeof participants>;
   types: string[];
+  fleet: FleetVehicle[];
 }) {
   const [v, setV] = useState({ type: '', tz: '', driver_id: '', seats: '', departure: '' });
   const drivers = people.filter((p) => p.role === 'נהג');
@@ -380,6 +382,30 @@ function VehiclesSection({
 
       {canEdit && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* pick a vehicle the unit already registered, צ׳ and all */}
+          {fleet.filter((x) => x.active).length > 0 && (
+            <select
+              className="input"
+              style={{ width: 'auto', minWidth: 190 }}
+              aria-label="בחירה מצי הרכבים"
+              value=""
+              onChange={(e) => {
+                const pick = fleet.find((x) => x.id === e.target.value);
+                if (pick)
+                  setV((s) => ({ ...s, type: pick.type, tz: pick.tz, seats: String(pick.seats) }));
+              }}
+            >
+              <option value="">בחר מצי הרכבים…</option>
+              {fleet
+                .filter((x) => x.active)
+                .map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.type} · צ׳ {x.tz}
+                    {x.fitness === 'כשיר' ? '' : ` · ${x.fitness}`}
+                  </option>
+                ))}
+            </select>
+          )}
           <select
             className="input"
             style={{ width: 'auto', minWidth: 160 }}
@@ -387,6 +413,8 @@ function VehiclesSection({
             onChange={(e) => setV((s) => ({ ...s, type: e.target.value }))}
           >
             <option value="">סוג רכב…</option>
+            {/* a fleet vehicle may be of a type nobody added to the catalog */}
+            {v.type && !types.includes(v.type) && <option value={v.type}>{v.type}</option>}
             {types.map((x) => (
               <option key={x} value={x}>
                 {x}

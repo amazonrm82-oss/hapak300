@@ -15,25 +15,23 @@ interface Props {
 }
 
 export function Dialog({ open, onClose, title, body, children, actions, width = 640, sheet }: Props) {
+  // A dialog closes only through the ✕ (or its own buttons) — never by tapping
+  // outside it and never on Escape. Half of these forms are long, and losing a
+  // half-filled training to a stray tap on the backdrop is worse than an extra
+  // deliberate tap to leave.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div
       className="dialog-backdrop"
-      onClick={onClose}
       style={{
         zIndex: 50,
         overflow: 'auto',
@@ -47,7 +45,6 @@ export function Dialog({ open, onClose, title, body, children, actions, width = 
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        onClick={(e) => e.stopPropagation()}
         style={
           sheet
             ? {
@@ -61,7 +58,21 @@ export function Dialog({ open, onClose, title, body, children, actions, width = 
             : { width: `min(${width}px, 100%)`, maxHeight: '88vh', overflow: 'auto' }
         }
       >
-        <span className="dialog-title">{title}</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span className="dialog-title" style={{ flex: 1, minWidth: 0 }}>
+            {title}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon"
+            onClick={onClose}
+            aria-label="סגירה"
+            title="סגירה"
+            style={{ flex: 'none', marginTop: -2, fontSize: 18, lineHeight: 1 }}
+          >
+            ✕
+          </button>
+        </div>
         {body ? <span className="dialog-body">{body}</span> : null}
         {children}
         {actions ? <div className="dialog-actions">{actions}</div> : null}

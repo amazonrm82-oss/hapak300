@@ -3,12 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
+import { LogisticsEditor, type LogisticsDraft } from '@/components/dialogs/LogisticsEditor';
 import { Field } from '@/components/ui/bits';
 import { DEFAULT_FREQ, DEFAULT_PICKUP } from '@/lib/core/constants';
 import { addDays, weekStart } from '@/lib/core/dates';
+import { defaultLogistics } from '@/lib/core/defaults';
 import { roleLabel } from '@/lib/core/permissions';
 import { fullName, topicName, topicSafety } from '@/lib/core/selectors';
-import type { TrainingFull, TrainingTeam } from '@/lib/core/types';
+import type { Db, TrainingFull, TrainingTeam } from '@/lib/core/types';
 import { createTraining, updateTraining, type TrainingForm } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
@@ -36,12 +38,25 @@ const blank = (topicId: string, safety: string, date: string): TrainingForm => (
   notes: '',
 });
 
+/** The proposal the system makes for a training's kit, from topic and roster. */
+const proposeLogistics = (
+  db: Db,
+  topicId: string,
+  teamId: TrainingTeam,
+  start: string,
+  location: string,
+): LogisticsDraft => defaultLogistics(topicId === '__new' ? '' : topicId, teamId, start || '07:00', db.people, location);
+
 /** Every field the unit made mandatory before a training may be published. */
 export function TrainingFormDialog({ open, training, week = 1, onClose }: Props) {
   const { db, user, toast, refresh } = useApp();
   const router = useRouter();
   const [f, setF] = useState<TrainingForm | null>(null);
   const [busy, setBusy] = useState(false);
+  // The kit proposal follows the topic, team, time and location until the
+  // commander edits it — after that their list is the one that counts.
+  const [logi, setLogi] = useState<LogisticsDraft | null>(null);
+  const [logiTouched, setLogiTouched] = useState(false);
 
   useEffect(() => {
     if (!open || !db) return;
@@ -72,7 +87,19 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         ),
       );
     }
+    setLogi(null);
+    setLogiTouched(false);
   }, [open, training, db, week]);
+
+  // A new training gets a live proposal, refreshed only when one of the four
+  // inputs it depends on changes; an existing training keeps its own logistics,
+  // edited on the training's logistics tab.
+  const inputs = f ? [f.topic_id, f.team_id, f.start, f.location].join('|') : '';
+  useEffect(() => {
+    if (!open || !db || training || logiTouched || !inputs) return;
+    const [topic, team, start, location] = inputs.split('|');
+    setLogi(proposeLogistics(db, topic, team as TrainingTeam, start, location));
+  }, [open, db, training, logiTouched, inputs]);
 
   if (!open || !db || !user || !f) return null;
 
@@ -106,7 +133,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         await refresh();
         toast('האימון עודכן — כל הצוות קיבל התראה');
       } else {
-        const id = await createTraining(db!, user!, f!);
+        const id = await createTraining(db!, user!, { ...f!, ...cleanLogistics(logi) });
         await refresh();
         toast('האימון נוצר ופורסם לצוות');
         if (id) router.push(`/trainings/${id}`);
@@ -124,7 +151,11 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
       open
       onClose={onClose}
       title={training ? 'עריכת אימון' : 'אימון חדש'}
-      body="חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות. הלוגיסטיקה נוצרת אוטומטית לפי הנושא וניתנת לעריכה במסך האימון."
+      body={
+        training
+          ? 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות.'
+          : 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות. הציוד, הרכבים, התחמושת והמזון ממולאים למטה כהצעה — ערוך לפני השמירה.'
+      }
       actions={
         <>
           <button className="btn btn-secondary" onClick={onClose}>
@@ -250,9 +281,41 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         </Field>
       </div>
 
+      {!training && logi && (
+        <LogisticsEditor
+          db={db}
+          value={logi}
+          onChange={(next) => {
+            setLogiTouched(true);
+            setLogi(next);
+          }}
+          onReset={() => {
+            setLogiTouched(false);
+            setLogi(proposeLogistics(db, f.topic_id, f.team_id, f.start, f.location));
+          }}
+        />
+      )}
+
+      {training && (
+        <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
+          ציוד, רכבים, תחמושת ומזון של אימון קיים נערכים בלשונית ״לוגיסטיקה״ של האימון.
+        </span>
+      )}
+
       <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
         מדריך ומפקד אימון יקבלו הזמנה ויידרשו לאשר תוך {db.settings.invite_hours} שעות. שינוי תאריך/שעות/מיקום שולח התראה לכל הצוות.
       </span>
     </Dialog>
   );
+}
+
+/** Drops the blank rows a half-filled form leaves behind. */
+function cleanLogistics(l: LogisticsDraft | null) {
+  if (!l) return {};
+  return {
+    gear: l.gear.filter((g) => g.name.trim()),
+    vehicles: l.vehicles.filter((v) => v.type.trim()),
+    ammo: l.ammo.filter((a) => a.weapon.trim()),
+    food: l.food.filter((x) => x.name.trim()),
+  };
 }

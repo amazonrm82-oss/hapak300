@@ -39,6 +39,7 @@ export async function loadDb(): Promise<Db> {
     vehicleTypes,
     weapons,
     locations,
+    fleet,
   ] = await Promise.all([
     sb.from('settings').select('*').single(),
     sb.from('teams').select('*'),
@@ -62,6 +63,7 @@ export async function loadDb(): Promise<Db> {
     sb.from('vehicle_types').select('name').order('sort'),
     sb.from('weapons').select('name').order('sort'),
     sb.from('locations').select('name').order('sort'),
+    sb.from('fleet').select('*').order('sort'),
   ]);
 
   const firstError = [settings, teams, topics, people, trainings].find((r) => r.error)?.error;
@@ -210,6 +212,7 @@ export async function loadDb(): Promise<Db> {
     vehicle_types: (vehicleTypes.data ?? []).map((r: { name: string }) => r.name),
     weapons: (weapons.data ?? []).map((r: { name: string }) => r.name),
     locations: (locations.data ?? []).map((r: { name: string }) => r.name),
+    fleet: (fleet.data ?? []) as Db['fleet'],
     calendar: (calendar.data ?? []) as Db['calendar'],
     notifications: ((notifications.data ?? []) as Record<string, unknown>[]).map((n) => ({
       id: n.id as string,

@@ -139,3 +139,125 @@ select case when (select approved_all from trainings limit 1) then '✅' else '�
 select reopen_attendance((select id from trainings limit 1));
 select case when count(*)=1 then '✅' else '❌' end || '  25  פתיחה מחדש מוחקת את הסימונים האוטומטיים'
 from attendance;
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ RANK ORDER: ADMINISTRATOR ABOVE HQ-PARTY COMMANDER ════════
+-- Both manage the unit; only the administrator may act on an administrator.
+update people set auth_id='22222222-2222-2222-2222-222222222222' where pn='7387250';
+
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+
+select case when is_admin() and not is_sysadmin() then '✅' else '❌' end ||
+       '  26  מפקד החפ״ק מנהל את היחידה אך אינו מנהל מערכת';
+
+do $t$ begin
+  update people set phone='052-9999999' where id=(select id from people_view where pn='7466718');
+  raise notice '✅  27  מפקד החפ״ק עורך לוחם רגיל';
+exception when others then
+  raise notice '❌  27  מפקד החפ״ק נחסם מלערוך לוחם רגיל — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  update people set phone='052-0000000' where id=(select id from people_view where pn='8409505');
+  raise notice '❌  28  מפקד החפ״ק ערך מנהל מערכת — כשל אבטחה';
+exception when others then
+  raise notice '✅  28  מפקד החפ״ק נחסם מלערוך מנהל מערכת';
+end $t$;
+
+do $t$ begin
+  update people set is_admin=true where id=me_id();
+  raise notice '❌  29  מפקד החפ״ק מינה את עצמו למנהל מערכת — כשל אבטחה';
+exception when others then
+  raise notice '✅  29  מפקד החפ״ק נחסם ממינוי מנהל מערכת';
+end $t$;
+
+do $t$ begin
+  insert into people (team_id, rank, name, role, pn, phone, rating, is_admin)
+  values ('b','סרן','ניסיון הסלמה','מאבטח','7000001','052-5555555',7,true);
+  raise notice '❌  30  מפקד החפ״ק הוסיף מנהל מערכת חדש — כשל אבטחה';
+exception when others then
+  raise notice '✅  30  מפקד החפ״ק נחסם מהוספת מנהל מערכת';
+end $t$;
+
+do $t$ begin
+  delete from people where id=(select id from people_view where pn='8409505');
+  raise notice '❌  31  מפקד החפ״ק הסיר מנהל מערכת — כשל אבטחה';
+exception when others then
+  raise notice '✅  31  מפקד החפ״ק נחסם מהסרת מנהל מערכת';
+end $t$;
+
+do $t$ begin
+  perform reset_pin((select id from people_view where pn='8409505'));
+  raise notice '❌  32  מפקד החפ״ק אפס את קוד מנהל המערכת — כשל אבטחה';
+exception when others then
+  raise notice '✅  32  מפקד החפ״ק נחסם מאיפוס קוד של מנהל מערכת';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ AND THE OTHER DIRECTION ════════
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+do $t$ begin
+  update people set phone='052-8888888' where id=(select id from people_view where pn='7387250');
+  raise notice '✅  33  מנהל מערכת עורך את מפקד החפ״ק';
+exception when others then
+  raise notice '❌  33  מנהל מערכת נחסם מלערוך את מפקד החפ״ק — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  update people set is_admin=true where id=(select id from people_view where pn='7241938');
+  raise notice '✅  34  מנהל מערכת ממנה מנהל מערכת נוסף';
+exception when others then
+  raise notice '❌  34  מנהל מערכת נחסם ממינוי מנהל מערכת — %', sqlerrm;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ INVITATIONS ════════
+-- The CASE in invite_person/respond_invite yields text, and Postgres will not
+-- cast text into an enum column on its own: without the explicit cast neither
+-- issuing an invitation nor answering one worked at all.
+insert into auth.users (id) values ('55555555-5555-5555-5555-555555555555');
+update people set auth_id='55555555-5555-5555-5555-555555555555' where pn='7455120';
+
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+do $t$ begin
+  perform invite_person((select id from trainings limit 1), 'instructor',
+                        (select id from people_view where pn='7455120'));
+  raise notice '✅  35  הזמנת מדריך נרשמה';
+exception when others then
+  raise notice '❌  35  הזמנת מדריך נכשלה — %', sqlerrm;
+end $t$;
+
+select case when (select inst_status from trainings limit 1)='pending'
+            then '✅' else '❌' end || '  36  ההזמנה ממתינה למענה';
+
+reset role; reset request.jwt.claim.sub;
+
+set request.jwt.claim.sub = '55555555-5555-5555-5555-555555555555';
+set role authenticated;
+
+do $t$ begin
+  perform respond_invite((select id from trainings limit 1), 'instructor', true);
+  raise notice '✅  37  המדריך אישר את ההזמנה';
+exception when others then
+  raise notice '❌  37  אישור ההזמנה נכשל — %', sqlerrm;
+end $t$;
+
+select case when (select inst_status from trainings limit 1)='accepted'
+            then '✅' else '❌' end || '  38  הסטטוס עודכן ל״אושר״';
+
+do $t$ begin
+  perform respond_invite((select id from trainings limit 1), 'commander', true);
+  raise notice '❌  39  אושרה הזמנה של מישהו אחר — כשל אבטחה';
+exception when others then
+  raise notice '✅  39  אי אפשר לאשר הזמנה שאינה שלך';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

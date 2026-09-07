@@ -147,6 +147,12 @@ export default function ProfilePage() {
               </label>
             ))}
             <PushToggle />
+            <Link
+              href="/install"
+              style={{ fontSize: 12.5, alignSelf: 'flex-start' }}
+            >
+              התקנת האפליקציה בטלפון (אייפון / גלקסי) →
+            </Link>
           </SectionCard>
 
           <div className="hapak-mobile-links" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

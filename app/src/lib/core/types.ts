@@ -108,6 +108,17 @@ export interface Vehicle {
   fault: string;
 }
 
+/** A vehicle the unit owns, entered once and picked by its צ׳ from then on. */
+export interface FleetVehicle {
+  id: string;
+  tz: string;
+  type: string;
+  seats: number;
+  fitness: Fitness;
+  note: string;
+  active: boolean;
+}
+
 export interface AmmoRow {
   id: string;
   weapon: string;
@@ -264,6 +275,7 @@ export interface Db {
   vehicle_types: string[];
   weapons: string[];
   locations: string[];
+  fleet: FleetVehicle[];
   calendar: CalendarEvent[];
   notifications: Notification[];
   join_requests: JoinRequest[];

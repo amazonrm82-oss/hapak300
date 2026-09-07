@@ -23,6 +23,16 @@ language sql stable security definer set search_path = public as $$
   select coalesce((select is_admin or is_hapak_commander from people where auth_id = auth.uid()), false)
 $$;
 
+-- The system administrator alone. The two levels manage the same unit, but the
+-- administrator outranks the HQ-party commander: only an administrator appoints
+-- another administrator, or edits, demotes, removes one, or resets their code.
+-- Without this the "levels" would differ in name only — a commander could reset
+-- the administrator's code and walk into the account.
+create or replace function is_sysadmin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select is_admin from people where auth_id = auth.uid()), false)
+$$;
+
 create or replace function is_team_cmd() returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce((select is_team_commander from people where auth_id = auth.uid()), false)
@@ -124,6 +134,7 @@ alter table notification_reads enable row level security;
 alter table join_requests      enable row level security;
 alter table reminders_sent     enable row level security;
 alter table push_subscriptions enable row level security;
+alter table fleet              enable row level security;
 
 -- ── settings ───────────────────────────────────────────────────────────────
 create policy settings_read on settings for select to authenticated using (true);
@@ -170,6 +181,42 @@ end $$;
 
 create trigger people_self_edit_guard before update on people
   for each row execute function guard_people_self_edit();
+
+-- The HQ-party commander manages the unit, but not the rank above them: they
+-- may not appoint an administrator (themselves included), and may not touch an
+-- administrator's row at all — no edit, no demotion, no removal, no code reset.
+-- An administrator may do all of it, in both directions.
+create or replace function guard_admin_rank() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  -- No end-user JWT means this is the server acting for itself — the login route
+  -- stamping `auth_id` onto the administrator's own row, say. Ordinary sessions
+  -- can never reach here without one: the policies grant writes to
+  -- `authenticated` alone.
+  if auth.uid() is null or is_sysadmin() then
+    if tg_op = 'DELETE' then return old; else return new; end if;
+  end if;
+
+  if tg_op = 'DELETE' then
+    if old.is_admin then
+      raise exception 'רק מנהל מערכת יכול להסיר מנהל מערכת';
+    end if;
+    return old;
+  end if;
+
+  if tg_op = 'UPDATE' and old.is_admin then
+    raise exception 'רק מנהל מערכת יכול לערוך מנהל מערכת';
+  end if;
+
+  if new.is_admin then
+    raise exception 'רק מנהל מערכת יכול למנות מנהל מערכת';
+  end if;
+
+  return new;
+end $$;
+
+create trigger people_admin_rank_guard before insert or update or delete on people
+  for each row execute function guard_admin_rank();
 
 -- The last administrator cannot be demoted or deleted — otherwise nobody can
 -- ever manage the system again.
@@ -258,6 +305,12 @@ begin
       tbl, tbl);
   end loop;
 end $$;
+
+-- ── the vehicle fleet ──────────────────────────────────────────────────────
+-- Everyone picks from it; commanders maintain it, like the other catalogs.
+create policy fleet_read on fleet for select to authenticated using (true);
+create policy fleet_write on fleet for all to authenticated
+  using (is_admin() or is_team_cmd()) with check (is_admin() or is_team_cmd());
 
 -- ── trainings ──────────────────────────────────────────────────────────────
 create policy trainings_read on trainings for select to authenticated using (true);

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
 import { CERT_TYPES, RANKS, ROLES } from '@/lib/core/constants';
-import { permsFor } from '@/lib/core/permissions';
+import { canEditPerson, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
 import { removePerson, resetPin, savePerson, type PersonForm } from '@/lib/data/mutations';
@@ -72,6 +72,8 @@ export function PersonDialog({ open, person, onClose }: Props) {
   if (!open || !db || !user) return null;
 
   const perms = permsFor(db, user, null);
+  // an HQ-party commander may not act on an administrator — the rank above them
+  const locked = !!person && !canEditPerson(user, person);
   const set =
     <K extends keyof PersonForm>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -110,12 +112,12 @@ export function PersonDialog({ open, person, onClose }: Props) {
         title={person ? 'עריכת לוחם' : 'הוספת לוחם'}
         actions={
           <>
-            {person && perms.canManagePeople && person.id !== user.id && (
+            {person && perms.canManagePeople && person.id !== user.id && !locked && (
               <button className="btn btn-ghost" onClick={() => setConfirmRemove(true)}>
                 הסרה מהמערכת
               </button>
             )}
-            {person?.has_pin && (
+            {person?.has_pin && !locked && (
               <button
                 className="btn btn-ghost"
                 onClick={async () => {
@@ -136,12 +138,27 @@ export function PersonDialog({ open, person, onClose }: Props) {
             <button className="btn btn-secondary" onClick={onClose}>
               ביטול
             </button>
-            <button className="btn btn-primary" onClick={() => void save()} disabled={busy}>
+            <button className="btn btn-primary" onClick={() => void save()} disabled={busy || locked}>
               שמירה
             </button>
           </>
         }
       >
+        {locked && (
+          <span
+            style={{
+              fontSize: 12.5,
+              lineHeight: 1.6,
+              color: 'var(--color-accent-300)',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-neutral-900)',
+            }}
+          >
+            {fullName(person!)} הוא מנהל מערכת — דרגת ההרשאה מעל מפקד החפ״ק. עריכה, הסרה או איפוס קוד
+            שמורים למנהל מערכת בלבד.
+          </span>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="שם מלא" style={{ gridColumn: 'span 2' }}>
             <input className="input" value={f.name} onChange={set('name')} />
@@ -240,11 +257,17 @@ export function PersonDialog({ open, person, onClose }: Props) {
                 onChange={set('is_hapak_commander')}
                 label="מפקד החפ״ק — ניהול מלא: אנשים, הרשאות, תאריכים ושעות של כל אימון"
               />
-              <Check
-                checked={f.is_admin}
-                onChange={set('is_admin')}
-                label="מנהל מערכת — ניהול מלא והגדרות"
-              />
+              {perms.isSysAdmin ? (
+                <Check
+                  checked={f.is_admin}
+                  onChange={set('is_admin')}
+                  label="מנהל מערכת — ניהול מלא והגדרות, ודרגת הרשאה מעל מפקד החפ״ק"
+                />
+              ) : (
+                <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
+                  מינוי מנהל מערכת שמור למנהל מערכת בלבד.
+                </span>
+              )}
             </>
           )}
         </div>

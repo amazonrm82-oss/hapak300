@@ -269,6 +269,14 @@ export function AppHeader() {
               >
                 הפרופיל שלי
               </Link>
+              <Link
+                className="btn btn-secondary"
+                href="/install"
+                style={{ justifyContent: 'flex-start' }}
+                onClick={() => setMenuOpen(false)}
+              >
+                התקנה בטלפון והתראות
+              </Link>
               {perms.isAdmin && (
                 <Link
                   className="btn btn-secondary"

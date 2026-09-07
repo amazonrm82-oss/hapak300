@@ -185,12 +185,12 @@ begin
   self := pid = actor;
   if role = 'instructor' then
     update trainings set instructor_id = pid,
-                         inst_status = case when self then 'accepted' else 'pending' end,
+                         inst_status = (case when self then 'accepted' else 'pending' end)::invite_status,
                          inst_invited_at = now()
      where id = tid;
   else
     update trainings set commander_id = pid,
-                         cmd_status = case when self then 'accepted' else 'pending' end,
+                         cmd_status = (case when self then 'accepted' else 'pending' end)::invite_status,
                          cmd_invited_at = now()
      where id = tid;
   end if;
@@ -215,9 +215,9 @@ begin
   if not coalesce(ok, false) then raise exception 'ההזמנה אינה שלך'; end if;
 
   if role = 'instructor' then
-    update trainings set inst_status = case when accept then 'accepted' else 'declined' end where id = tid;
+    update trainings set inst_status = (case when accept then 'accepted' else 'declined' end)::invite_status where id = tid;
   else
-    update trainings set cmd_status  = case when accept then 'accepted' else 'declined' end where id = tid;
+    update trainings set cmd_status  = (case when accept then 'accepted' else 'declined' end)::invite_status where id = tid;
   end if;
 
   select array_remove(array_agg(distinct x), null) into leaders from (
@@ -288,10 +288,12 @@ begin
 
     i := 0;
     for row_json in select * from jsonb_array_elements(coalesce(d->'vehicles','[]'::jsonb)) loop
-      insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
+      insert into vehicles (training_id, type, tz, driver_id, seats, departure, fitness, fault, sort)
       values (tid, row_json->>'type', coalesce(row_json->>'tz',''),
               nullif(row_json->>'driver_id','')::uuid, (row_json->>'seats')::int,
-              row_json->>'departure', i);
+              row_json->>'departure',
+              coalesce(nullif(row_json->>'fitness','')::vehicle_fitness, 'כשיר'),
+              coalesce(row_json->>'fault',''), i);
       i := i + 1;
     end loop;
 
@@ -389,7 +391,7 @@ begin
   select * into j from join_requests where id = jid;
   if not found then raise exception 'הבקשה לא נמצאה'; end if;
 
-  update join_requests set status = case when accept then 'approved' else 'rejected' end where id = jid;
+  update join_requests set status = (case when accept then 'approved' else 'rejected' end)::join_status where id = jid;
   if not accept then return null; end if;
 
   insert into people (team_id, rank, name, role, pn, phone, rating)
