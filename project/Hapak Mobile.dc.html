@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="_ds/nocturne-7586e364-a8eb-4fc3-a856-7f2842cc6a68/styles.css">
+  <link rel="stylesheet" href="hapak-theme.css">
+  <script src="_ds/nocturne-7586e364-a8eb-4fc3-a856-7f2842cc6a68/_ds_bundle.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --font-heading: "Inter", "Heebo", system-ui, sans-serif; --font-body: "Inter", "Heebo", system-ui, sans-serif; }
+    body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); }
+    a { color: var(--color-accent); } a:hover { color: var(--color-accent-400); }
+  </style>
+</helmet>
+<div dir="rtl" lang="he" style="min-height:100vh;background:var(--hapak-ground);background-attachment:fixed;color:var(--color-text);padding:20px 24px 48px;display:flex;flex-direction:column;gap:18px;align-items:center">
+  <div style="width:100%;max-width:1100px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="assets/emblem.png" alt="" style="height:40px;width:auto">
+      <div><h2 style="font-size:22px;margin:0 0 2px">כשירות חפ״ק מח״ט 300 · אפליקציה</h2><p style="margin:0;font-size:13px;color:var(--color-neutral-500)">שני המכשירים מחוברים לאותם נתונים — סימון באחד מתעדכן מיד בשני ובאתר</p></div>
+    </div>
+    <a class="btn btn-secondary" href="Hapak Web.dc.html">לאתר המלא</a>
+  </div>
+  <div style="display:flex;gap:40px;flex-wrap:wrap;justify-content:center;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <span style="font-size:12px;color:var(--color-neutral-500)">iPhone</span>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <dc-import name="Hapak Mobile App" top-pad="{{ 56 }}" bottom-pad="{{ 30 }}" hint-size="100%,100%"></dc-import>
+      </x-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <span style="font-size:12px;color:var(--color-neutral-500)">Android</span>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412px,892px">
+        <dc-import name="Hapak Mobile App" top-pad="{{ 10 }}" bottom-pad="{{ 10 }}" hint-size="100%,100%"></dc-import>
+      </x-import>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/nocturne-7586e364-a8eb-4fc3-a856-7f2842cc6a68/styles.css">
+  <link rel="stylesheet" href="hapak-theme.css">
+  <script src="_ds/nocturne-7586e364-a8eb-4fc3-a856-7f2842cc6a68/_ds_bundle.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --font-heading: "Inter", "Heebo", system-ui, sans-serif; --font-body: "Inter", "Heebo", system-ui, sans-serif; }
+    body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); }
+    a { color: var(--color-accent); } a:hover { color: var(--color-accent-400); }
+    select.input option { background: var(--color-surface); color: var(--color-text); }
+    input[type="checkbox"] { accent-color: var(--color-accent); }
+  </style>
+</helmet>
+<div dir="rtl" lang="he" style="min-height:100%;display:flex;flex-direction:column;background:var(--hapak-ground);color:var(--color-text);font-size:14px;position:relative">
+  <sc-if value="{{ loading }}" hint-placeholder-val="{{ true }}"><div style="min-height:100%;display:grid;place-items:center;padding:80px 20px;color:var(--color-neutral-500);font-size:13px">טוען…</div></sc-if>
+  <sc-if value="{{ hasErr }}" hint-placeholder-val="{{ false }}"><div style="padding:80px 20px;color:var(--color-accent-300);font-size:13px">{{ err }}</div></sc-if>
+
+  <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+    <div style="padding: {{ topPad }} 20px 40px;display:flex;flex-direction:column;gap:14px;min-height:100%">
+      <img src="assets/emblem.png" alt="" style="height:72px;width:auto;align-self:flex-start;margin-top:16px">
+      <h1 style="font-size:26px;margin:0">{{ appName }}</h1>
+      <p style="margin:0;font-size:13px;color:var(--color-neutral-400);text-wrap:pretty">לו״ז, נוכחות, מדריכים, לוגיסטיקה ותחמושת — לשני צוותי החפ״ק.</p>
+      <p style="margin:0;font-size:12px;color:var(--color-neutral-500);text-wrap:pretty">הכניסה במספר אישי — רק למי שנוסף למערכת על ידי מנהל המערכת או מפקד החפ״ק.</p>
+      <div class="field"><label>מספר אישי (7 ספרות)</label><input class="input" inputMode="numeric" maxLength="7" value="{{ loginPn }}" onChange="{{ setLoginPn }}" onKeyDown="{{ loginKey }}" placeholder="7241938" style="font-size:20px;text-align:center;letter-spacing:.12em;min-height:48px;font-variant-numeric:tabular-nums"></div>
+      <sc-if value="{{ pinStage }}" hint-placeholder-val="{{ false }}">
+        <div class="field"><label>{{ pinLabel }}</label><input class="input" type="password" inputMode="numeric" maxLength="4" value="{{ loginPin }}" onChange="{{ setLoginPin }}" onKeyDown="{{ loginKey }}" placeholder="••••" style="font-size:22px;text-align:center;letter-spacing:.4em;min-height:48px"></div>
+        <sc-if value="{{ pinConfirm }}" hint-placeholder-val="{{ false }}"><div class="field"><label>אימות הקוד</label><input class="input" type="password" inputMode="numeric" maxLength="4" value="{{ loginPin2 }}" onChange="{{ setLoginPin2 }}" onKeyDown="{{ loginKey }}" placeholder="••••" style="font-size:22px;text-align:center;letter-spacing:.4em;min-height:48px"></div></sc-if>
+      </sc-if>
+      <sc-if value="{{ hasLoginErr }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;color:var(--color-accent-300)">{{ loginErr }}</span></sc-if>
+      <button class="btn btn-primary" onClick="{{ submitLogin }}" style="min-height:48px;font-size:15px">{{ loginBtn }}</button>
+      <sc-if value="{{ pinStage }}" hint-placeholder-val="{{ false }}"><button class="btn btn-ghost" onClick="{{ loginBack }}" style="min-height:44px">חזרה</button></sc-if>
+      <sc-if value="{{ allowJoin }}" hint-placeholder-val="{{ true }}"><button class="btn btn-secondary" onClick="{{ openJoin }}" style="min-height:44px">בקשת הצטרפות</button></sc-if>
+      <sc-if value="{{ showDemo }}" hint-placeholder-val="{{ true }}"><span style="font-size:11.5px;color:var(--color-neutral-500);margin-top:8px">משתמשי דמו — לחיצה מחברת</span>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <sc-for list="{{ demoUsers }}" as="d" hint-placeholder-count="4">
+          <button onClick="{{ d.pick }}" style="display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:8px;border-radius:var(--radius-md);border:1px solid var(--color-neutral-900);background:var(--color-surface);color:inherit;cursor:pointer;text-align:start;font-family:inherit;min-height:48px">
+            <span style="width:34px;height:34px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-200);display:grid;place-items:center;font-size:11px">{{ d.initials }}</span>
+            <span style="display:flex;flex-direction:column"><span style="font-size:13.5px">{{ d.name }}</span><span style="font-size:11.5px;color:var(--color-neutral-500)">{{ d.sub }}</span></span>
+            <span style="font-size:11.5px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ d.pn }}</span>
+          </button>
+        </sc-for>
+      </div></sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ false }}">
+    <header style="position:sticky;top:0;z-index:10;background:var(--hapak-chrome);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--color-divider);padding: {{ topPad }} 16px 8px;display:flex;align-items:center;gap:10px">
+      <img src="assets/emblem.png" alt="" style="height:28px;width:auto">
+      <div style="display:flex;flex-direction:column;line-height:1.15;min-width:0;flex:1"><span style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ appName }}</span><span style="font-size:10.5px;color:var(--color-neutral-500);white-space:nowrap">{{ screenTitle }} · {{ todayLabel }}</span></div>
+      <button onClick="{{ toggleNotifs }}" aria-label="התראות" style="position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--color-divider);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8 175.94c-5.55-9.56-13.8-36.61-13.8-71.94a80 80 0 0 0-160 0c0 35.34-8.26 62.38-13.81 71.94A16 16 0 0 0 48 200h40.81a40 40 0 0 0 78.38 0H208a16 16 0 0 0 13.8-24.06ZM128 216a24 24 0 0 1-22.62-16h45.24A24 24 0 0 1 128 216Z"/></svg><sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-4px;inset-inline-end:-4px;min-width:18px;height:18px;border-radius:9px;background:var(--color-accent);color:var(--color-bg);font-size:11px;display:grid;place-items:center;padding:0 5px">{{ unread }}</span></sc-if></button>
+      <span style="width:34px;height:34px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-200);display:grid;place-items:center;font-size:11px">{{ user.initials }}</span>
+    </header>
+
+    <main style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px">
+      <sc-if value="{{ isNotifs }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:18px;margin:0">התראות</h3><button class="btn btn-ghost" onClick="{{ markAllRead }}" style="font-size:12px">סמן הכול כנקרא</button></div>
+        <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="3"><button onClick="{{ n.click }}" class="card" style="text-align:start;border:0;cursor:pointer;color:inherit;font-family:inherit;flex-direction:row;gap:10px;align-items:flex-start;padding:10px 12px"><span style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background: {{ n.dotBg }}"></span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;line-height:1.45">{{ n.text }}</span><span style="font-size:11px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ n.time }}</span></span></button></sc-for>
+        <sc-if value="{{ noNotifs }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:var(--color-neutral-500)">אין התראות</span></sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ G.hasBanners }}" hint-placeholder-val="{{ false }}"><sc-for list="{{ G.banners }}" as="b" hint-placeholder-count="1"><div class="card elev-md" style="padding:12px 14px;gap:6px;box-shadow:0 0 0 1px var(--color-accent)"><span class="tag tag-accent" style="align-self:flex-start">{{ b.when }}</span><span class="card-title" style="font-size:16px">{{ b.title }}</span><span style="font-size:12.5px;color:var(--color-neutral-400);font-variant-numeric:tabular-nums">{{ b.sub }}</span><div style="display:flex;gap:8px"><sc-if value="{{ b.canMark }}" hint-placeholder-val="{{ false }}"><button class="btn btn-primary" onClick="{{ b.mark }}" style="flex:1;min-height:44px">סימון נוכחות</button></sc-if><button class="btn btn-secondary" onClick="{{ b.open }}" style="flex:1;min-height:44px">פרטים</button></div></div></sc-for></sc-if>
+        <sc-if value="{{ hasInvites }}" hint-placeholder-val="{{ false }}"><sc-for list="{{ invites }}" as="iv" hint-placeholder-count="1"><div class="card" style="padding:10px 12px;gap:8px;box-shadow:0 0 0 1px var(--color-accent-700)"><span class="tag tag-accent" style="align-self:flex-start">הזמנה ממתינה</span><span style="font-size:13px">{{ iv.text }}</span><div style="display:flex;gap:8px"><button class="btn btn-primary" onClick="{{ iv.accept }}" style="flex:1;min-height:40px">אשר</button><button class="btn btn-secondary" onClick="{{ iv.decline }}" style="flex:1;min-height:40px">דחה</button></div></div></sc-for></sc-if>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h3 style="font-size:17px;margin:0">תקופת אימונים · {{ periodName }}</h3><span style="font-size:11px;color:var(--color-neutral-500)">גלילה לצדדים</span></div>
+        <div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;margin:0 -16px;padding-inline:16px;scroll-snap-type:x mandatory">
+          <sc-for list="{{ weeks }}" as="w" hint-placeholder-count="11">
+            <button onClick="{{ w.select }}" style="flex:0 0 118px;scroll-snap-align:start;text-align:start;padding:8px;border-radius:var(--radius-md);border:0;cursor:pointer;color:inherit;font-family:inherit;display:flex;flex-direction:column;gap:6px;min-height:104px;background: {{ w.bg }};box-shadow: {{ w.ring }}">
+              <span style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums"><span>שבוע {{ w.label }}</span><span>{{ w.date }}</span></span>
+              <sc-if value="{{ w.isJoint }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.3;color:var(--color-accent-100)"><span style="display:block;font-size:10px;color:var(--color-accent-300)">משותף</span>{{ w.jointTitle }}</span></sc-if>
+              <sc-if value="{{ w.notJoint }}" hint-placeholder-val="{{ true }}"><span style="font-size:11.5px;line-height:1.3"><span style="color:var(--color-neutral-500)">א׳ </span>{{ w.aTitle }}</span><span style="font-size:11.5px;line-height:1.3"><span style="color:var(--color-neutral-500)">ב׳ </span>{{ w.bTitle }}</span></sc-if>
+              <sc-if value="{{ w.isToday }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;color:var(--color-accent)">היום</span></sc-if>
+            </button>
+          </sc-for>
+        </div>
+        <h4 style="font-size:15px;margin:0">{{ selWeekLabel }}</h4>
+        <sc-for list="{{ weekCards }}" as="c" hint-placeholder-count="1">
+          <article class="card elev-sm" style="padding:14px;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:11px;color:var(--color-accent)">{{ c.kicker }}</span><span class="tag {{ c.statusCls }}">{{ c.statusLabel }}</span></div>
+            <span class="card-title" style="font-size:18px">{{ c.title }}</span>
+            <span style="font-size:12.5px;color:var(--color-neutral-400);font-variant-numeric:tabular-nums">{{ c.dateLine }} · {{ c.rel }}</span>
+            <span style="font-size:12.5px;color:var(--color-neutral-400)">{{ c.location }} · יציאה {{ c.departure }}</span>
+            <span style="font-size:12.5px;color:var(--color-neutral-400)">מדריך {{ c.instructor }} · מפקד אימון {{ c.commander }}</span>
+            <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:3px;border-radius:2px;background:var(--color-neutral-800);overflow:hidden"><div style="height:100%;background:var(--color-accent);width: {{ c.pctStr }}"></div></div><span style="font-size:11px;color:var(--color-neutral-400);font-variant-numeric:tabular-nums">{{ c.att }}</span></div>
+            <span style="font-size:12px;color:var(--color-neutral-400)">{{ c.mineLabel }}</span>
+            <div style="display:flex;gap:8px"><sc-if value="{{ c.canMark }}" hint-placeholder-val="{{ true }}"><button class="btn btn-primary" onClick="{{ c.mark }}" style="flex:1;min-height:44px">{{ c.markLabel }}</button></sc-if><button class="btn btn-secondary" onClick="{{ c.open }}" style="min-height:44px">פרטים</button><button class="btn btn-ghost" onClick="{{ c.chat }}" style="min-height:44px">{{ c.chatLabel }}</button></div>
+          </article>
+        </sc-for>
+        <sc-if value="{{ noWeekCards }}" hint-placeholder-val="{{ false }}"><div style="border:1px dashed var(--color-neutral-800);border-radius:var(--radius-md);padding:16px;font-size:13px;color:var(--color-neutral-500);text-align:center">אין אימונים בשבוע זה</div></sc-if>
+        <section class="card" style="padding:12px 14px;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span class="card-title" style="font-size:13.5px">יומן המח״ט · השבוע</span><span style="font-size:10px;color:var(--color-neutral-500)">Google Calendar</span></div>
+          <sc-for list="{{ calEvents }}" as="e" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:46px 1fr;gap:8px;font-size:12px"><span style="color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ e.day }}</span><span><span style="color:var(--color-neutral-400);font-variant-numeric:tabular-nums">{{ e.time }}</span> {{ e.title }}</span></div></sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isMine }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ hasMine }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:11px;color:var(--color-accent)">{{ M.kicker }}</span><span class="tag {{ M.statusCls }}">{{ M.statusLabel }}</span></div>
+          <h3 style="font-size:22px;margin:0">{{ M.title }}</h3>
+          <span style="font-size:13px;color:var(--color-neutral-400);font-variant-numeric:tabular-nums">{{ M.dateLine }} · {{ M.rel }}</span>
+          <sc-if value="{{ M.canMark }}" hint-placeholder-val="{{ true }}"><button class="btn btn-primary" onClick="{{ M.mark }}" style="min-height:48px;font-size:15px">{{ M.markLabel }}</button></sc-if>
+          <span style="font-size:12.5px;color:var(--color-neutral-400)">{{ M.mineLabel }}</span>
+          <sc-if value="{{ M.hasAlerts }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding:10px 12px;gap:4px;box-shadow:0 0 0 1px var(--color-accent-800)"><span style="font-size:11px;color:var(--color-accent)">התרעות למפקד</span><sc-for list="{{ M.alerts }}" as="al" hint-placeholder-count="2"><span style="font-size:12.5px;color:var(--color-accent-300)">• {{ al.text }}</span></sc-for></div></sc-if>
+          <section class="card" style="padding:12px 14px;gap:6px">
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:12.5px">
+              <span style="color:var(--color-neutral-500)">מיקום</span><span>{{ M.location }} · נצ״ד <span style="font-variant-numeric:tabular-nums">{{ M.coords }}</span></span>
+              <span style="color:var(--color-neutral-500)">יציאה</span><span style="font-variant-numeric:tabular-nums">{{ M.departure }}</span>
+              <span style="color:var(--color-neutral-500)">מדריך</span><span>{{ M.instructor }}</span>
+              <span style="color:var(--color-neutral-500)">מפקד אימון</span><span>{{ M.commander }}</span>
+              <span style="color:var(--color-neutral-500)">קשר</span><span>{{ M.freq }}</span>
+              <span style="color:var(--color-neutral-500)">מזג אוויר</span><span>{{ M.weather }}</span>
+              <span style="color:var(--color-neutral-500)">זריחה / שקיעה</span><span style="font-variant-numeric:tabular-nums">{{ M.sun }}</span>
+              <span style="color:var(--color-neutral-500)">חובש / פינוי</span><span>{{ M.medic }} · {{ M.evac }}</span>
+            </div>
+          </section>
+          <section class="card" style="padding:12px 14px;gap:6px"><span class="card-title" style="font-size:13.5px">לו״ז יום האימון</span><sc-for list="{{ M.blocks }}" as="b" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:48px 1fr;gap:10px;font-size:12.5px;padding:3px 0"><span style="color:var(--color-accent-300);font-variant-numeric:tabular-nums">{{ b.time }}</span><span>{{ b.title }}</span></div></sc-for></section>
+          <section class="card" style="padding:12px 14px;gap:6px"><span class="card-title" style="font-size:13.5px">הוראות בטיחות</span><p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--color-neutral-300)">{{ M.safety }}</p></section>
+          <section class="card" style="padding:12px 14px;gap:8px">
+            <span class="card-title" style="font-size:13.5px">לוגיסטיקה</span>
+            <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ M.vehicles }}" as="x" hint-placeholder-count="2"><span class="tag tag-neutral">{{ x.label }}</span></sc-for><sc-for list="{{ M.food }}" as="x" hint-placeholder-count="3"><span class="tag tag-neutral">{{ x.label }}</span></sc-for></div>
+            <div style="display:flex;flex-direction:column;gap:3px;font-size:12.5px"><span style="color:var(--color-neutral-500)">תחמושת</span><sc-for list="{{ M.ammo }}" as="x" hint-placeholder-count="2"><span>{{ x.label }}</span></sc-for></div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--color-neutral-400)"><sc-for list="{{ M.gear }}" as="x" hint-placeholder-count="5"><span>{{ x.label }}</span></sc-for></div>
+          </section>
+          <section class="card" style="padding:12px 14px;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="card-title" style="font-size:13.5px">נוכחות</span><span style="font-size:11.5px;color:var(--color-neutral-400)">{{ M.att }}</span></div>
+            <span style="font-size:12px;color:var(--color-neutral-500)">{{ M.approvedLabel }}</span>
+            <sc-for list="{{ M.attRows }}" as="r" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--color-neutral-900)">
+                <span style="width:28px;height:28px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-200);display:grid;place-items:center;font-size:10px">{{ r.initials }}</span>
+                <span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:13px">{{ r.name }}</span><span style="font-size:11px;color:var(--color-neutral-500)">{{ r.role }} · {{ r.reason }}</span></span>
+                <span style="display:flex;align-items:center;gap:6px"><span class="tag {{ r.statusCls }}" style="font-size:10.5px">{{ r.statusLabel }}</span><sc-if value="{{ r.approved }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;color:var(--color-accent-300)">אושר</span></sc-if><sc-if value="{{ r.canApprove }}" hint-placeholder-val="{{ false }}"><button class="btn btn-ghost" onClick="{{ r.approve }}" style="font-size:11.5px;padding:2px 6px">אשר</button></sc-if><sc-if value="{{ r.canEdit }}" hint-placeholder-val="{{ false }}"><button class="btn btn-ghost" onClick="{{ r.edit }}" style="font-size:11.5px;padding:2px 6px">עדכן</button></sc-if></span>
+              </div>
+            </sc-for>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><sc-if value="{{ M.canSummarize }}" hint-placeholder-val="{{ false }}"><button class="btn btn-secondary" onClick="{{ M.summarize }}" style="flex:1;min-height:40px">סיכום נוכחות</button></sc-if><sc-if value="{{ M.canApproveAll }}" hint-placeholder-val="{{ false }}"><button class="btn btn-primary" onClick="{{ M.approveAll }}" style="flex:1;min-height:40px">אישור סופי לכולם</button></sc-if><sc-if value="{{ M.canReopen }}" hint-placeholder-val="{{ false }}"><button class="btn btn-secondary" onClick="{{ M.reopen }}" style="min-height:40px">פתיחה מחדש</button></sc-if></div>
+          </section>
+          <sc-if value="{{ G.pendingSummary }}" hint-placeholder-val="{{ false }}"><span class="tag tag-accent" style="align-self:flex-start">האימון עבר — ממתין לסיכום ואישור נוכחות</span></sc-if>
+          <sc-if value="{{ G.canGiveFeedback }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding:10px 12px;gap:8px;box-shadow:0 0 0 1px var(--color-accent-700)"><span style="font-size:13px">{{ G.myFeedback }}</span><button class="btn btn-primary" onClick="{{ G.openFeedback }}" style="min-height:44px">{{ G.fbBtn }}</button></div></sc-if>
+          <sc-for list="{{ M.reminders }}" as="r" hint-placeholder-count="2"><span style="font-size:11.5px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ r.text }}</span></sc-for>
+          <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ M.share }}" style="flex:1;min-height:44px">שיתוף פקודת אימון</button><button class="btn btn-ghost" onClick="{{ M.chat }}" style="min-height:44px">{{ M.chatLabel }}</button></div>
+          <sc-if value="{{ M.hasOthers }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--color-neutral-500);margin-top:6px">אימונים נוספים</span><sc-for list="{{ M.others }}" as="o" hint-placeholder-count="2"><button class="btn btn-secondary" onClick="{{ o.open }}" style="justify-content:flex-start;min-height:44px;font-size:12.5px">{{ o.label }}</button></sc-for></sc-if>
+        </sc-if>
+        <sc-if value="{{ noMine }}" hint-placeholder-val="{{ false }}"><div style="border:1px dashed var(--color-neutral-800);border-radius:var(--radius-md);padding:24px;text-align:center;color:var(--color-neutral-500);font-size:13px">{{ noMineMsg }}</div></sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isChat }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ hasMine }}" hint-placeholder-val="{{ true }}">
+          <span style="font-size:12px;color:var(--color-neutral-500)">{{ M.kicker }} · {{ M.title }}</span>
+          <sc-for list="{{ Ch.pinned }}" as="m" hint-placeholder-count="1"><div class="card" style="padding:8px 12px;gap:2px;box-shadow:0 0 0 1px var(--color-accent-700)"><span style="font-size:10.5px;color:var(--color-accent)">נעוץ · {{ m.author }}</span><span style="font-size:13px">{{ m.text }}</span></div></sc-for>
+          <div style="display:flex;flex-direction:column;gap:10px;min-height:200px">
+            <sc-for list="{{ Ch.messages }}" as="m" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:3px;max-width:86%;align-self: {{ m.align }}">
+                <span style="font-size:11px;color:var(--color-neutral-500)">{{ m.author }} · <span style="font-variant-numeric:tabular-nums">{{ m.time }}</span></span>
+                <div style="padding:8px 11px;border-radius:var(--radius-md);font-size:13.5px;line-height:1.45;background: {{ m.bg }}">{{ m.text }}<sc-if value="{{ m.hasImg }}" hint-placeholder-val="{{ false }}">{{ m.img }}</sc-if><sc-if value="{{ m.hasAtt }}" hint-placeholder-val="{{ false }}"><span style="display:block;font-size:11px;color:var(--color-neutral-400)">קובץ: {{ m.attName }}</span></sc-if></div>
+                <span style="display:flex;gap:10px;font-size:10.5px;color:var(--color-neutral-500)"><span>{{ m.readLabel }}</span><sc-if value="{{ m.canPin }}" hint-placeholder-val="{{ false }}"><button onClick="{{ m.pin }}" style="background:transparent;border:0;color:var(--color-accent);cursor:pointer;font-size:10.5px;padding:0;font-family:inherit">{{ m.pinLabel }}</button></sc-if></span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ Ch.empty }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:var(--color-neutral-500)">אין הודעות עדיין</span></sc-if>
+          </div>
+          <div style="display:flex;gap:6px;align-items:flex-end;position:sticky;bottom:0"><textarea class="input" rows="1" placeholder="הודעה לצוות…" value="{{ Ch.draft }}" onChange="{{ Ch.onDraft }}" onKeyDown="{{ Ch.onKey }}" style="min-height:44px;flex:1"></textarea><label class="btn btn-secondary" style="min-height:44px;cursor:pointer">קובץ<input type="file" accept="image/*,.pdf" onChange="{{ Ch.attach }}" style="display:none"></label><button class="btn btn-primary" onClick="{{ Ch.send }}" style="min-height:44px">שלח</button></div>
+        </sc-if>
+        <sc-if value="{{ noMine }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:var(--color-neutral-500)">אין אימון פעיל לצ׳אט</span></sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isTeam }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ teams }}" as="tm" hint-placeholder-count="1">
+          <section class="card" style="padding:12px 14px;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="display:flex;flex-direction:column"><span class="card-title" style="font-size:17px">{{ tm.name }}</span><span style="font-size:12px;color:var(--color-neutral-400)">מפקד: {{ tm.commander }}</span></div><sc-if value="{{ tm.showScore }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span style="font-size:18px;font-variant-numeric:tabular-nums">{{ tm.score }}<span style="font-size:10px;color:var(--color-neutral-500)"> /10</span></span><div style="display:grid;grid-template-columns:repeat(10,8px);gap:2px"><sc-for list="{{ tm.segs }}" as="s" hint-placeholder-count="10"><span style="height:4px;border-radius:2px;background: {{ s.bg }}"></span></sc-for></div></div></sc-if></div>
+            <sc-for list="{{ tm.roster }}" as="p" hint-placeholder-count="10">
+              <div style="display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--color-neutral-900)"><span style="width:30px;height:30px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-200);display:grid;place-items:center;font-size:10.5px">{{ p.initials }}</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">{{ p.name }}<sc-if value="{{ p.isCmd }}" hint-placeholder-val="{{ false }}"><span class="tag tag-accent" style="font-size:9.5px;padding:1px 5px">מפקד צוות</span></sc-if><sc-if value="{{ p.isInstr }}" hint-placeholder-val="{{ false }}"><span class="tag tag-outline" style="font-size:9.5px;padding:1px 5px">מדריך</span></sc-if><sc-if value="{{ p.inactive }}" hint-placeholder-val="{{ false }}"><span class="tag tag-neutral" style="font-size:9.5px;padding:1px 5px">מושבת</span></sc-if></span><span style="font-size:11px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ p.sub }}</span></span></div>
+            </sc-for>
+          </section>
+        </sc-for>
+        <span style="font-size:12px;color:var(--color-neutral-500)">{{ otherTeamNote }}</span>
+      </sc-if>
+
+      <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+        <section class="card" style="padding:14px;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:44px;height:44px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-200);display:grid;place-items:center;font-size:14px">{{ me.initials }}</span><div style="display:flex;flex-direction:column"><span class="card-title" style="font-size:17px">{{ me.name }}</span><span style="font-size:12px;color:var(--color-neutral-400)">{{ me.roleLabel }}</span></div></div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px"><span style="color:var(--color-neutral-500)">מספר אישי</span><span style="font-variant-numeric:tabular-nums">{{ me.pn }}</span><span style="color:var(--color-neutral-500)">טלפון</span><span>{{ me.phone }}</span><span style="color:var(--color-neutral-500)">שיוך</span><span>{{ me.team }}</span></div>
+          <sc-if value="{{ me.hasTeam }}" hint-placeholder-val="{{ true }}"><span style="font-size:11.5px;color:var(--color-neutral-500)">כשירות אישית {{ me.score }}/10 · {{ me.note }}</span><div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px"><sc-for list="{{ me.segs }}" as="s" hint-placeholder-count="10"><span style="height:5px;border-radius:2px;background: {{ s.bg }}"></span></sc-for></div></sc-if>
+          <sc-if value="{{ me.isInstructor }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ me.quals }}" as="q" hint-placeholder-count="2"><span class="tag tag-outline">מדריך · {{ q.label }}</span></sc-for></div></sc-if>
+        </section>
+        <section class="card" style="padding:12px 14px;gap:6px"><span class="card-title" style="font-size:13.5px">הנוכחות שלי</span><sc-for list="{{ myAtt }}" as="r" hint-placeholder-count="4"><button onClick="{{ r.open }}" style="display:flex;justify-content:space-between;gap:8px;background:transparent;border:0;color:inherit;font-family:inherit;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--color-neutral-900);font-size:12.5px;text-align:start;min-height:36px"><span>{{ r.label }}</span><span style="color:var(--color-neutral-400);white-space:nowrap">{{ r.status }} <span style="color:var(--color-accent-300)">{{ r.approved }}</span></span></button></sc-for></section>
+        <section class="card" style="padding:12px 14px;gap:8px"><span class="card-title" style="font-size:13.5px">הגדרות התראות</span><sc-for list="{{ prefs }}" as="p" hint-placeholder-count="4"><label style="display:flex;align-items:center;gap:10px;font-size:13px;min-height:36px;cursor:pointer"><input type="checkbox" checked="{{ p.on }}" onChange="{{ p.toggle }}">{{ p.label }}</label></sc-for></section>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn btn-secondary" onClick="{{ goLogistics }}" style="min-height:44px">לוגיסטיקה</button><button class="btn btn-secondary" onClick="{{ goArchive }}" style="min-height:44px">ארכיון</button></div>
+        <a class="btn btn-ghost" href="Hapak Web.dc.html" style="min-height:44px">לאתר המלא</a>
+        <button class="btn btn-ghost" onClick="{{ logout }}" style="min-height:44px">יציאה</button>
+      </sc-if>
+
+      <sc-if value="{{ isLogistics }}" hint-placeholder-val="{{ false }}">
+        <button class="btn btn-ghost" onClick="{{ backHome }}" style="align-self:flex-start;padding-inline:0">‹ חזרה</button>
+        <sc-for list="{{ logi }}" as="l" hint-placeholder-count="3">
+          <section class="card" style="padding:12px 14px;gap:6px">
+            <div style="display:flex;justify-content:space-between;gap:8px"><span class="card-title" style="font-size:14px">{{ l.code }}</span><span style="font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ l.date }}</span></div>
+            <span style="font-size:12.5px;color:var(--color-neutral-400)">{{ l.vehicles }} · {{ l.ammo }}</span><span style="font-size:12.5px;color:var(--color-neutral-400)">{{ l.food }}</span>
+            <span style="font-size:12px;color:var(--color-neutral-500)">{{ l.gearLabel }}</span>
+            <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ l.gear }}" as="g" hint-placeholder-count="4"><button class="btn {{ g.cls }}" onClick="{{ g.toggle }}" disabled="{{ g.locked }}" style="font-size:11.5px;padding:3px 9px">{{ g.label }}</button></sc-for></div>
+            <button class="btn btn-ghost" onClick="{{ l.open }}" style="align-self:flex-start;font-size:12px">לפרטי האימון</button>
+          </section>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{ isArchive }}" hint-placeholder-val="{{ false }}">
+        <button class="btn btn-ghost" onClick="{{ backHome }}" style="align-self:flex-start;padding-inline:0">‹ חזרה</button>
+        <sc-if value="{{ noArch }}" hint-placeholder-val="{{ false }}"><div style="border:1px dashed var(--color-neutral-800);border-radius:var(--radius-md);padding:24px;text-align:center;color:var(--color-neutral-500);font-size:13px">{{ archEmpty }}</div></sc-if>
+        <sc-for list="{{ arch }}" as="r" hint-placeholder-count="2"><button onClick="{{ r.open }}" class="card elev-sm" style="text-align:start;border:0;cursor:pointer;color:inherit;font-family:inherit;padding:12px 14px;gap:4px"><span style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:11px;color:var(--color-accent)">{{ r.date }}</span><span class="tag {{ r.statusCls }}">{{ r.status }}</span></span><span class="card-title" style="font-size:15px">{{ r.code }}</span><span style="font-size:12.5px;color:var(--color-neutral-400)">{{ r.summary }}</span></button></sc-for>
+      </sc-if>
+    </main>
+
+    <nav style="position:sticky;bottom:0;z-index:10;background:var(--hapak-chrome);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--color-divider);display:grid;grid-template-columns:repeat(5,1fr);padding:6px 6px {{ bottomPad }}">
+      <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="5">
+        <button onClick="{{ tb.pick }}" style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border:0;background:transparent;cursor:pointer;font-family:inherit;min-height:48px;color: {{ tb.color }}">
+          <span style="width:22px;height:3px;border-radius:2px;background: {{ tb.bar }}"></span>
+          <span style="font-size:11.5px;white-space:nowrap">{{ tb.label }}</span>
+          <sc-if value="{{ tb.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;color:var(--color-accent)">{{ tb.badge }}</span></sc-if>
+        </button>
+      </sc-for>
+    </nav>
+  </sc-if>
+
+  <sc-if value="{{ hasDialog }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ dlg.close }}" style="position:absolute;inset:0;z-index:40;background:color-mix(in srgb, var(--color-neutral-900) 60%, transparent);display:flex;align-items:flex-end">
+      <div onClick="{{ dlg.stop }}" style="width:100%;background:var(--color-surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:16px 16px 28px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-lg);max-height:85%;overflow:auto">
+        <sc-if value="{{ dlg.isAttendance }}" hint-placeholder-val="{{ false }}">
+          <span class="dialog-title" style="font-size:18px">סימון נוכחות</span>
+          <span style="font-size:12.5px;color:var(--color-neutral-400)">{{ dlg.tTitle }} · {{ dlg.targetName }}</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><sc-for list="{{ dlg.attOptions }}" as="o" hint-placeholder-count="6"><button class="btn {{ o.cls }}" onClick="{{ o.pick }}" style="min-height:46px">{{ o.label }}</button></sc-for></div>
+          <sc-if value="{{ dlg.needsReason }}" hint-placeholder-val="{{ false }}"><div class="field"><label>סיבה (חובה)</label><textarea class="input" rows="2" value="{{ F.reason }}" onChange="{{ S.reason }}" placeholder="לדוגמה: מילואים בגדוד אחר"></textarea></div></sc-if>
+          <span style="font-size:11px;color:var(--color-neutral-500)">אפשר לעדכן עד תחילת האימון · מי שלא סימן נחשב ״לא מגיע״</span>
+          <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ dlg.close }}" style="flex:1;min-height:46px">ביטול</button><button class="btn btn-primary" onClick="{{ dlg.saveAttendance }}" style="flex:2;min-height:46px">שמירה</button></div>
+        </sc-if>
+        <sc-if value="{{ G.dlgx.isFeedback }}" hint-placeholder-val="{{ false }}">
+          <span class="dialog-title" style="font-size:18px">משוב על האימון</span><span style="font-size:12.5px;color:var(--color-neutral-400)">{{ G.dlgx.fbTitle }} · נראה למפקדים ולמדריך</span>
+          <sc-for list="{{ G.dlgx.fbRows }}" as="r" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;color:var(--color-neutral-400)">{{ r.label }}</span><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px"><sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="5"><button class="btn {{ o.cls }}" onClick="{{ o.pick }}" style="min-height:44px">{{ o.label }}</button></sc-for></div></div></sc-for>
+          <div class="field"><label>הערה חופשית (רשות)</label><textarea class="input" rows="2" value="{{ G.dlgx.fbComment }}" onChange="{{ G.dlgx.setFbComment }}"></textarea></div>
+          <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ dlg.close }}" style="flex:1;min-height:46px">ביטול</button><button class="btn btn-primary" onClick="{{ G.dlgx.save }}" style="flex:2;min-height:46px">שליחת משוב</button></div>
+        </sc-if>
+        <sc-if value="{{ dlg.isJoin }}" hint-placeholder-val="{{ false }}">
+          <span class="dialog-title" style="font-size:18px">בקשת הצטרפות</span>
+          <div class="field"><label>שם מלא</label><input class="input" value="{{ F.name }}" onChange="{{ S.name }}" style="min-height:44px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="field"><label>מספר אישי</label><input class="input" inputMode="numeric" maxLength="7" value="{{ F.pn }}" onChange="{{ S.pn }}" style="min-height:44px"></div><div class="field"><label>טלפון</label><input class="input" value="{{ F.phone }}" onChange="{{ S.phone }}" style="min-height:44px"></div>
+            <div class="field"><label>דרגה</label><select class="input" value="{{ F.rank }}" onChange="{{ S.rank }}" style="min-height:44px"><sc-for list="{{ dlg.rankOpts }}" as="o" hint-placeholder-count="12"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select></div><div class="field"><label>תפקיד</label><select class="input" value="{{ F.role }}" onChange="{{ S.role }}" style="min-height:44px"><sc-for list="{{ dlg.roleOpts }}" as="o" hint-placeholder-count="5"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select></div></div>
+          <div class="field"><label>צוות מבוקש</label><select class="input" value="{{ F.teamId }}" onChange="{{ S.teamId }}" style="min-height:44px"><sc-for list="{{ dlg.teamOpts }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select></div>
+          <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ dlg.close }}" style="flex:1;min-height:46px">ביטול</button><button class="btn btn-primary" onClick="{{ dlg.submitJoin }}" style="flex:2;min-height:46px">שלח בקשה</button></div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}"><div style="position:sticky;bottom:96px;margin:0 16px;background:var(--color-surface);padding:10px 14px;border-radius:var(--radius-md);box-shadow:var(--shadow-md);font-size:13px;z-index:30">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:874},&quot;topPad&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:54,&quot;tsType&quot;:&quot;number&quot;,&quot;description&quot;:&quot;ריפוד עליון (px) מתחת לסרגל המצב של המכשיר&quot;},&quot;bottomPad&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:22,&quot;tsType&quot;:&quot;number&quot;,&quot;description&quot;:&quot;ריפוד תחתון (px) מעל אינדיקטור הבית&quot;},&quot;demoDate&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;description&quot;:&quot;ריק = התאריך האמיתי; YYYY-MM-DD לסימולציה&quot;},&quot;showDemoUsers&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;description&quot;:&quot;כניסה מהירה — רק כשמצב ההפעלה האמיתית כבוי&quot;},&quot;allowJoinRequests&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;description&quot;:&quot;כפתור בקשת הצטרפות למי שלא רשום&quot;}}">
+class Component extends DCLogic {
+  state = { ready: false, err: '', db: null, userId: null, tab: 'schedule', screen: null, tid: null, selWeek: 1, dialog: null, form: {}, toast: null, notifOpen: false, loginPn: '', loginErr: '', draft: '' };
+  iid = 'm' + Math.random().toString(36).slice(2, 8);
+  componentDidMount() {
+    this.onSync = e => { if (e.detail && e.detail.source === this.iid) return; if (this.C) this.setState({ db: this.C.loadDB(), userId: this.C.loadSession() }); };
+    window.addEventListener('hapak:changed', this.onSync);
+    import('./hapak-core.js').then(m => { this.C = m; const db = m.loadDB(); const userId = m.loadSession(); this.setState({ ready: true, db, userId, selWeek: this.clampWeek(db, m.weekOf(this.today())) }); }).catch(e => this.setState({ err: 'טעינת הנתונים נכשלה: ' + e.message }));
+  }
+  componentWillUnmount() { window.removeEventListener('hapak:changed', this.onSync); clearTimeout(this._tt); }
+  today() { const d = this.props.demoDate; return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '2026-09-07'; }
+  periodWeeks(db) { return Math.max(4, ...db.trainings.filter(t => t.status !== 'cancelled').map(t => this.C.weekOf(t.date))); }
+  showDemo() { return this.props.showDemoUsers ?? true; }
+  allowJoin() { return (this.props.allowJoinRequests ?? true) && this.state.db.settings.allowJoin !== false; }
+  clampWeek(db, w) { return Math.max(1, Math.min(w, this.periodWeeks(db))); }
+  user() { const { db, userId } = this.state; return db && userId ? this.C.personById(db, userId) : null; }
+  stamp() { return this.C.nowStamp(this.today()); }
+  commit(extra) { const db = this.state.db; db.__today = this.today(); this.C.saveDB(db); this.C.broadcast(this.iid); this.setState({ db, ...(extra || {}) }); }
+  toast(msg) { clearTimeout(this._tt); this.setState({ toast: msg }); this._tt = setTimeout(() => this.setState({ toast: null }), 2600); }
+  setF(k) { return e => { const v = e && e.target ? (e.target.type === 'checkbox' ? e.target.checked : e.target.value) : e; this.setState(s => ({ form: { ...s.form, [k]: v } })); }; }
+  dialog(type, data, form) { this.setState({ dialog: { type, ...(data || {}) }, form: form || {}, notifOpen: false }); }
+  closeDialog() { this.setState({ dialog: null, form: {} }); }
+  loginAs(pid) { this.C.saveSession(pid); this.C.broadcast(this.iid); this.setState({ userId: pid, loginErr: '', loginPn: '', tab: 'schedule', screen: null, dialog: null }); }
+  submitLogin() { const pn = (this.state.loginPn || '').trim(); const db = this.state.db; if (!/^\d{7}$/.test(pn)) return this.setState({ loginErr: 'מספר אישי חייב להיות 7 ספרות' }); const p = db.people.find(x => x.pn === pn); if (!p) return this.setState({ loginErr: this.allowJoin() ? 'המספר האישי לא רשום — רק מי שנוסף על ידי המנהל יכול להיכנס. אפשר לשלוח בקשת הצטרפות.' : 'המספר האישי לא רשום — פנה למנהל המערכת או למפקד החפ״ק.' }); if (p.status !== 'active') return this.setState({ loginErr: 'המשתמש מושבת זמנית — פנה למנהל המערכת.' }); this.loginAs(p.id); }
+  logout() { this.C.saveSession(null); this.C.broadcast(this.iid); this.setState({ userId: null, dialog: null, notifOpen: false, tab: 'schedule', screen: null }); }
+  myTraining() { const u = this.user(); const db = this.state.db; if (this.state.tid) { const t = this.C.byId(db.trainings, this.state.tid); if (t) return t; } return this.C.upcomingFor(db, u, this.today())[0] || null; }
+  openTraining(tid, tab) { const t = this.C.byId(this.state.db.trainings, tid); if (!t) return; if (tab === 'chat') this.markRead(t); this.setState({ tid, tab: tab || 'mine', screen: null, notifOpen: false }); }
+  markRead(t) { const u = this.user(); let ch = false; t.chat.forEach(m => { if (!m.readBy.includes(u.id)) { m.readBy.push(u.id); ch = true; } }); if (ch) this.C.saveDB(this.state.db); }
+  // ── פעולות ──
+  openAttendance(tid, pid) { const t = this.C.byId(this.state.db.trainings, tid); const u = this.user(); const p = pid || u.id; const a = t.attendance[p] || {}; this.dialog('attendance', { tid, pid: p }, { status: a.status || '', reason: a.reason || '' }); }
+  saveAttendance() { const { dialog, form, db } = this.state; const t = this.C.byId(db.trainings, dialog.tid); if (!form.status) return this.toast('בחר סטטוס נוכחות'); if (form.status !== 'coming' && form.status !== 'late' && !(form.reason || '').trim()) return this.toast('חובה לציין סיבה כשלא מגיעים'); const prev = t.attendance[dialog.pid] || {}; t.attendance[dialog.pid] = { status: form.status, reason: form.status === 'coming' ? '' : (form.reason || '').trim(), time: this.stamp(), approved: false, approvedBy: null, rating: prev.rating || null }; this.commit({ dialog: null, form: {} }); this.toast('הנוכחות נשמרה'); }
+  approve(tid, pid) { const db = this.state.db, C = this.C; const t = C.byId(db.trainings, tid); const u = this.user(); const ps = C.participants(db, t); ps.forEach(p => { if (pid && p.id !== pid) return; if (!t.attendance[p.id]) t.attendance[p.id] = { status: 'absent', reason: 'לא הגיב — נחשב לא מגיע', time: this.stamp(), approved: false, approvedBy: null, rating: null, auto: true }; t.attendance[p.id].approved = true; t.attendance[p.id].approvedBy = u.id; }); if (!pid) t.approvedAll = true; t.approvalLog.push({ by: u.id, at: this.stamp(), scope: pid || 'all' }); C.notify(db, `נוכחות ${pid ? 'של ' + C.fullName(C.personById(db, pid)) : 'סופית'} ל${C.trainingTitle(db, t)} אושרה על ידי ${C.fullName(u)}.`, pid ? [pid, u.id] : ps.map(p => p.id).concat([u.id]), t.id); this.commit(); this.toast(pid ? 'הנוכחות אושרה' : 'הנוכחות הסופית אושרה'); }
+  reopen(tid) { const t = this.C.byId(this.state.db.trainings, tid); Object.keys(t.attendance).forEach(k => { if (t.attendance[k].auto) delete t.attendance[k]; else { t.attendance[k].approved = false; t.attendance[k].approvedBy = null; } }); t.approvedAll = false; this.commit(); this.toast('הנוכחות נפתחה מחדש'); }
+  summarizeAtt(tid) { const db = this.state.db, C = this.C; const t = C.byId(db.trainings, tid); const u = this.user(); t.trainerSummarized = true; C.notify(db, `מפקד האימון ${C.fullName(u)} סיכם את הנוכחות ל${C.trainingTitle(db, t)} — ממתין לאישור מפקד הצוות.`, [t.teamId === 'joint' ? null : db.teams[t.teamId].commanderId, u.id].filter(Boolean), t.id); this.commit(); this.toast('הסיכום נשלח למפקד הצוות'); }
+  respondInvite(tid, role, accept) { const db = this.state.db, C = this.C; const t = C.byId(db.trainings, tid); const u = this.user(); t[role === 'instructor' ? 'instStatus' : 'cmdStatus'] = accept ? 'accepted' : 'declined'; C.notify(db, `${C.fullName(u)} ${accept ? 'אישר' : 'דחה'} את ההזמנה ל${role === 'instructor' ? 'הדריך' : 'פקד על'} ${C.trainingTitle(db, t)}.${accept ? '' : ' המערכת מציעה מחליף.'}`, [...new Set([t.commanderId, ...(t.teamId === 'joint' ? [] : [db.teams[t.teamId].commanderId]), ...db.people.filter(p => p.isAdmin).map(p => p.id)])].filter(Boolean), t.id); this.commit(); this.toast(accept ? 'ההזמנה אושרה' : 'ההזמנה נדחתה'); }
+  sendMsg() { const t = this.myTraining(); const u = this.user(); const text = (this.state.draft || '').trim(); if (!t || !text) return; t.chat.push({ id: this.C.uid('m'), authorId: u.id, text, time: this.stamp(), pinned: false, readBy: [u.id], attachment: null }); this.commit({ draft: '' }); }
+  attach(e) { const t = this.myTraining(); const u = this.user(); const f = e.target.files && e.target.files[0]; if (!f || !t) return; const push = url => { t.chat.push({ id: this.C.uid('m'), authorId: u.id, text: '', time: this.stamp(), pinned: false, readBy: [u.id], attachment: { name: f.name, isImage: f.type.startsWith('image/'), url } }); this.commit(); }; if (f.type.startsWith('image/') && f.size < 350000) { const r = new FileReader(); r.onload = () => push(r.result); r.readAsDataURL(f); } else push(null); e.target.value = ''; }
+  togglePin(mid) { const t = this.myTraining(); const m = this.C.byId(t.chat, mid); m.pinned = !m.pinned; this.commit(); }
+  toggleReturned(tid, gid) { const t = this.C.byId(this.state.db.trainings, tid); const g = this.C.byId(t.gear, gid); g.returned = !g.returned; this.commit(); }
+  toggleNotifPref(k) { return () => { const u = this.user(); u.notif[k] = !u.notif[k]; this.commit(); }; }
+  submitJoin() { const f = this.state.form, db = this.state.db, C = this.C; if (!(f.name || '').trim() || !/^\d{7}$/.test(f.pn || '')) return this.toast('נדרשים שם ומספר אישי בן 7 ספרות'); if (db.people.some(p => p.pn === f.pn)) return this.toast('המספר האישי כבר קיים'); db.joinRequests.push({ id: C.uid('jr'), name: f.name.trim(), rank: f.rank || 'טוראי', role: f.role || 'מאבטח', pn: f.pn, phone: f.phone || '', teamId: f.teamId || 'a', status: 'pending', at: this.stamp() }); C.notify(db, `בקשת הצטרפות חדשה: ${f.rank || 'טוראי'} ${f.name.trim()} (${f.pn}) — ממתינה לאישור.`, db.people.filter(p => p.isAdmin || p.isHapakCommander).map(p => p.id)); this.commit({ dialog: null, form: {} }); this.toast('הבקשה נשלחה'); }
+  shareOrder(t) { const txt = this.C.orderText(this.state.db, t); if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => this.toast('פקודת האימון הועתקה'), () => this.toast('לא ניתן להעתיק בדפדפן זה')); else this.toast('לא ניתן להעתיק בדפדפן זה'); }
+
+  // ── תצוגה ──
+  card(db, u, today, t) { const C = this.C; const st = C.attendanceStats(db, t); const mine = t.attendance[u.id]; const isPart = C.participants(db, t).some(p => p.id === u.id); const perms = C.permsFor(db, u, t); const unread = t.chat.filter(m => !m.readBy.includes(u.id)).length;
+    return { id: t.id, kicker: `שבוע ${C.pad(C.weekOf(t.date))} · ${C.trainingTitle(db, t)}`, title: C.topicName(db, t.topicId), team: C.teamName(db, t.teamId), statusLabel: C.TRAINING_STATUS[t.status], statusCls: t.teamId === 'joint' ? 'tag-accent' : 'tag-neutral', dateLine: `יום ${C.dayLetter(t.date)} ${C.fmtShort(t.date)} · ${t.start}–${t.end}`, rel: C.relDays(today, t.date), location: t.location, coords: t.coords, departure: `${t.departure} · ${t.pickup}`, instructor: `${C.fullName(C.personById(db, t.instructorId))} · ${t.instStatus === 'accepted' ? 'אישר' : t.instStatus === 'declined' ? 'דחה' : 'ממתין'}`, commander: C.fullName(C.personById(db, t.commanderId)),
+      att: `${st.responded}/${st.total} סימנו · ${st.expected} מגיעים`, pctStr: `${st.pct}%`, mineLabel: mine ? `הסטטוס שלי: ${C.STATUS_LABEL[mine.status]}${mine.approved ? ' · אושר' : ''}` : isPart ? 'טרם סימנת נוכחות' : '', canMark: isPart && t.status !== 'done' && t.status !== 'cancelled' && today <= t.date, markLabel: mine ? 'עדכון נוכחות' : 'סימון נוכחות', mark: () => this.openAttendance(t.id), open: () => this.openTraining(t.id, 'mine'), chat: () => this.openTraining(t.id, 'chat'), chatLabel: unread ? `צ׳אט (${unread})` : 'צ׳אט', alerts: perms.seesStats ? C.trainingAlerts(db, t).map(x => ({ text: x })) : [], hasAlerts: perms.seesStats && C.trainingAlerts(db, t).length > 0, perms, stats: st }; }
+  renderVals() { const { ready, err, db, toast } = this.state; const C = this.C; const topPad = `${Number(this.props.topPad ?? 54)}px`, bottomPad = `${Number(this.props.bottomPad ?? 22)}px`;
+    if (!ready || !db) return { ready: false, loading: !err, hasErr: !!err, err, isLogin: false, loggedIn: false, hasToast: false, hasDialog: false, topPad, bottomPad };
+    const u = this.user(); const today = this.today();
+    const base = { ready: true, loading: false, hasErr: false, err: '', isLogin: !u, loggedIn: !!u, appName: db.settings.appName, todayLabel: `${C.dayLetter(today)} ${C.fmtShort(today)}`, hasToast: !!toast, toast, topPad, bottomPad };
+    if (!u) return { ...base, ...this.pinVals(db), loginPn: this.state.loginPn, setLoginPn: e => this.setState({ loginPn: e.target.value.replace(/\D/g, '').slice(0, 7), loginErr: '' }), loginKey: e => { if (e.key === 'Enter') this.submitLogin(); }, loginErr: this.state.loginErr, hasLoginErr: !!this.state.loginErr, submitLogin: () => this.submitLogin(), showDemo: this.showDemo(), allowJoin: this.allowJoin(), openJoin: () => this.dialog('join', {}, { name: '', rank: 'טוראי', role: 'מאבטח', pn: '', phone: '', teamId: 'a' }), demoUsers: (this.showDemo() ? db.people.filter(p => p.status === 'active').sort(C.rankSort).slice(0, 6) : []).map(p => ({ id: p.id, name: C.fullName(p), sub: C.roleLabel(db, p), pn: p.pn, initials: C.initials(p.name), pick: () => this.loginAs(p.id) })), ...this.dialogVals(db, null) };
+    const tab = this.state.tab; const screen = this.state.screen; const notifOpen = this.state.notifOpen; const t = this.myTraining(); const unreadChat = t ? t.chat.filter(m => !m.readBy.includes(u.id)).length : 0;
+    const all = C.notifsFor(db, u); const unread = all.filter(n => !n.read).length;
+    const tabs = [['schedule', 'לו״ז'], ['mine', 'האימון שלי'], ['chat', 'צ׳אט'], ['team', 'הצוות'], ['profile', 'פרופיל']].map(([id, label]) => ({ id, label, color: tab === id && !notifOpen && !screen ? 'var(--color-accent)' : 'var(--color-neutral-400)', bar: tab === id && !notifOpen && !screen ? 'var(--color-accent)' : 'transparent', hasBadge: id === 'chat' && unreadChat > 0, badge: unreadChat ? `${unreadChat} חדשות` : '', pick: () => { if (id === 'chat' && t) this.markRead(t); this.setState({ tab: id, screen: null, notifOpen: false }); } }));
+    const titles = { schedule: 'לו״ז', mine: 'האימון שלי', chat: 'צ׳אט האימון', team: 'הצוות', profile: 'פרופיל' };
+    const vals = { ...base, user: { initials: C.initials(u.name), name: C.fullName(u), roleLabel: C.roleLabel(db, u), pn: u.pn }, tabs, screenTitle: notifOpen ? 'התראות' : screen === 'logistics' ? 'לוגיסטיקה' : screen === 'archive' ? 'ארכיון' : titles[tab], unread, hasUnread: unread > 0, toggleNotifs: () => this.setState({ notifOpen: !notifOpen }),
+      isNotifs: notifOpen, notifs: all.slice(0, 20).map(n => ({ id: n.id, text: n.text, time: n.time, dotBg: n.read ? 'transparent' : 'var(--color-accent)', click: () => { n.read = true; C.saveDB(db); if (n.tid && C.byId(db.trainings, n.tid)) this.openTraining(n.tid, 'mine'); else this.setState({ notifOpen: false }); } })), noNotifs: all.length === 0, markAllRead: () => { all.forEach(n => { n.read = true; }); this.commit(); },
+      isSchedule: !notifOpen && !screen && tab === 'schedule', isMine: !notifOpen && !screen && tab === 'mine', isChat: !notifOpen && !screen && tab === 'chat', isTeam: !notifOpen && !screen && tab === 'team', isProfile: !notifOpen && !screen && tab === 'profile', isLogistics: !notifOpen && screen === 'logistics', isArchive: !notifOpen && screen === 'archive',
+      invites: db.trainings.filter(x => x.status !== 'cancelled' && x.status !== 'done' && ((x.instructorId === u.id && x.instStatus === 'pending') || (x.commanderId === u.id && x.cmdStatus === 'pending'))).map(x => { const role = x.instructorId === u.id && x.instStatus === 'pending' ? 'instructor' : 'commander'; return { id: x.id, text: `הוזמנת ל${role === 'instructor' ? 'הדריך' : 'פקד על'} ${C.trainingTitle(db, x)} · ${C.topicName(db, x.topicId)} · ${C.fmtShort(x.date)}`, accept: () => this.respondInvite(x.id, role, true), decline: () => this.respondInvite(x.id, role, false) }; }) };
+    vals.hasInvites = vals.invites.length > 0;
+    const mine = this.mineVals(db, u, today, t); mine.noMine = !mine.hasMine;
+    return { ...vals, ...this.extraVals(db, u, today, t), ...this.scheduleVals(db, u, today), ...mine, ...this.chatVals(db, u, t), ...this.teamVals(db, u, today), ...this.profileVals(db, u, today), ...this.listVals(db, u, today), ...this.dialogVals(db, u) }; }
+  chatVals(db, u, t) { const C = this.C; if (!t) return { Ch: { pinned: [], messages: [], empty: true } }; const perms = C.permsFor(db, u, t);
+    const messages = t.chat.map(m => { const a = C.personById(db, m.authorId); const readers = m.readBy.filter(x => x !== m.authorId).length; return { id: m.id, author: C.fullName(a), time: m.time, text: m.text, pinned: m.pinned, align: m.authorId === u.id ? 'flex-end' : 'flex-start', bg: m.authorId === u.id ? 'var(--color-accent-900)' : 'var(--color-surface)', readLabel: readers ? `נקרא על ידי ${readers}` : 'טרם נקרא', canPin: perms.canPin, pinLabel: m.pinned ? 'בטל נעיצה' : 'נעץ', pin: () => this.togglePin(m.id), hasAtt: !!m.attachment && !(m.attachment.isImage && m.attachment.url), attName: m.attachment ? m.attachment.name : '', hasImg: !!(m.attachment && m.attachment.isImage && m.attachment.url), img: m.attachment && m.attachment.url ? React.createElement('img', { src: m.attachment.url, alt: '', style: { maxWidth: '100%', maxHeight: 200, borderRadius: 4, marginTop: 6, display: 'block' } }) : null }; });
+    return { Ch: { pinned: messages.filter(m => m.pinned), messages, empty: messages.length === 0, draft: this.state.draft, onDraft: e => this.setState({ draft: e.target.value }), onKey: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendMsg(); } }, send: () => this.sendMsg(), attach: e => this.attach(e) } }; }
+  scheduleVals(db, u, today) { const C = this.C; const N = this.periodWeeks(db); const sel = this.state.selWeek; const live = db.trainings.filter(t => t.status !== 'cancelled');
+    const weeks = Array.from({ length: N }, (_, i) => { const w = i + 1; const ts = live.filter(t => C.weekOf(t.date) === w); const a = ts.find(t => t.teamId === 'a'), b = ts.find(t => t.teamId === 'b'), j = ts.find(t => t.teamId === 'joint'); const selected = w === sel;
+      return { id: w, label: C.pad(w), date: C.fmtShort(C.weekStart(w)), isToday: C.weekOf(today) === w, select: () => this.setState({ selWeek: w }), bg: selected ? 'var(--color-accent-900)' : 'var(--color-surface)', ring: selected ? '0 0 0 1px var(--color-accent)' : 'none', isJoint: !!j && !a && !b, notJoint: !(!!j && !a && !b), jointTitle: j ? C.topicName(db, j.topicId) : '', aTitle: a ? C.topicName(db, a.topicId) : (j ? C.topicName(db, j.topicId) : '—'), bTitle: b ? C.topicName(db, b.topicId) : (j ? C.topicName(db, j.topicId) : (w === 7 ? '—' : '—')), aMuted: !a && !j, bMuted: !b && !j }; });
+    const selTs = live.filter(t => C.weekOf(t.date) === sel).sort((x, y) => x.date.localeCompare(y.date)); const weekCards = selTs.map(t => this.card(db, u, today, t));
+    const calEvents = C.calendarEvents(sel).map((e, i) => ({ id: 'ce' + i, day: `${C.dayLetter(e.date)} ${C.fmtShort(e.date)}`, time: e.time, title: e.title }));
+    return { weeks, weekCards, noWeekCards: weekCards.length === 0, selWeekLabel: `שבוע ${C.pad(sel)} · ${C.weekRange(sel)}`, calEvents, teamAName: db.teams.a.name, teamBName: db.teams.b.name }; }
+  mineVals(db, u, today, t) { const C = this.C; if (!t) return { hasMine: false, noMineMsg: 'אין אימון קרוב משויך אליך' }; const c = this.card(db, u, today, t); const perms = c.perms; const ps = C.participants(db, t); const weather = C.weatherFor(t.date), sun = C.sunTimes(t.date);
+    const rows = (perms.seesList ? ps : ps.filter(p => p.id === u.id)).map(p => { const a = t.attendance[p.id]; return { id: p.id, initials: C.initials(p.name), name: C.fullName(p), role: p.role, statusLabel: a ? C.STATUS_LABEL[a.status] : 'לא הגיב', statusCls: !a ? 'tag-outline' : a.status === 'coming' ? 'tag-accent' : 'tag-neutral', reason: a ? a.reason : '', approved: !!(a && a.approved), canApprove: perms.canApprove && !(a && a.approved), approve: () => this.approve(t.id, p.id), canEdit: (p.id === u.id && c.canMark) || perms.canApprove || perms.isTrainCmd, edit: () => this.openAttendance(t.id, p.id) }; });
+    const others = C.upcomingFor(db, u, today).filter(x => x.id !== t.id).slice(0, 4).map(x => ({ id: x.id, label: `${C.trainingTitle(db, x)} · ${C.topicName(db, x.topicId)} · ${C.fmtShort(x.date)}`, open: () => this.openTraining(x.id, 'mine') }));
+    const veh = {}; t.vehicles.forEach(v => { veh[v.type] = (veh[v.type] || 0) + 1; });
+    return { hasMine: true, M: { ...c, weather: `${weather.text} · ${weather.hi}°/${weather.lo}°`, sun: `זריחה ${sun.rise} · שקיעה ${sun.set}`, freq: t.freq, safety: t.safety, medic: C.fullName(C.personById(db, t.medicId)), evac: (() => { const v = C.byId(t.vehicles, t.evacVehicleId); return v ? `${v.type} צ׳ ${v.tz}` : 'טרם נקבע'; })(), blocks: t.dayBlocks.map(b => ({ id: b.id, time: b.time, title: b.title })), gear: t.gear.map(g => ({ id: g.id, label: `${g.name} ×${g.qty}` })), vehicles: Object.entries(veh).map(([k, n]) => ({ id: k, label: `${k} ×${n}` })), ammo: t.ammo.map(a => ({ id: a.id, label: `${a.weapon}: ${a.allocated.toLocaleString('en-US')} כד׳${a.perFighter ? ` (${a.perFighter} ללוחם)` : ''}` })), food: t.food.map(f => ({ id: f.id, label: `${f.name} ${f.qty} ${f.unit}` })), attRows: rows, seesList: perms.seesList, approvedLabel: t.approvedAll ? 'הנוכחות הסופית אושרה' : t.trainerSummarized ? 'סוכם — ממתין לאישור מפקד הצוות' : 'פתוח לסימון עד תחילת האימון', canSummarize: perms.canSummarize && !t.trainerSummarized, summarize: () => this.summarizeAtt(t.id), canApproveAll: perms.canApprove && !t.approvedAll, approveAll: () => this.approve(t.id, null), canReopen: perms.canApprove && t.approvedAll, reopen: () => this.reopen(t.id), share: () => this.shareOrder(t), others, hasOthers: others.length > 0, reminders: C.reminderPreview(db, t, u).map((x, i) => ({ id: 'r' + i, text: x })) } }; }
+  teamVals(db, u, today) { const C = this.C; const perms = C.permsFor(db, u, null); const teamIds = u.teamId ? [u.teamId] : ['a', 'b'];
+    return { teams: teamIds.map(tm => { const r = C.readinessOf(db, p => p.teamId === tm, today); return { id: tm, name: db.teams[tm].name, commander: C.fullName(C.personById(db, db.teams[tm].commanderId)), score: r.score.toFixed(1), note: r.note, showScore: perms.seesStats, segs: Array.from({ length: 10 }, (_, i) => ({ id: i, bg: i < Math.round(r.score) ? 'var(--color-accent)' : 'var(--color-neutral-800)' })), roster: C.teamMembers(db, tm).map(p => ({ id: p.id, initials: C.initials(p.name), name: C.fullName(p), sub: `${p.role}${perms.seesPN ? ` · מ.א. ${p.pn}` : ''} · ${p.phone}`, isCmd: p.isTeamCommander, isInstr: p.isInstructor, inactive: p.status !== 'active', isMe: p.id === u.id })) }; }), otherTeamNote: u.teamId ? `הצוות השני (${C.teamName(db, u.teamId === 'a' ? 'b' : 'a')}) נפגש איתכם באימון המשותף` : '' }; }
+  profileVals(db, u, today) { const C = this.C; const r = C.readinessOf(db, p => p.id === u.id, today);
+    const myAtt = db.trainings.filter(t => t.status !== 'cancelled' && C.participants(db, t).some(p => p.id === u.id)).sort((a, b) => a.date.localeCompare(b.date)).map(t => { const a = t.attendance[u.id]; return { id: t.id, label: `${C.fmtShort(t.date)} · ${C.topicName(db, t.topicId)}`, status: a ? C.STATUS_LABEL[a.status] : 'טרם סומן', approved: a && a.approved ? 'מאושר' : '', open: () => this.openTraining(t.id, 'mine') }; });
+    return { me: { name: C.fullName(u), initials: C.initials(u.name), roleLabel: C.roleLabel(db, u), pn: u.pn, phone: u.phone || '—', team: u.teamId ? C.teamName(db, u.teamId) : 'מפקדה', score: (u.teamId ? r.score : u.rating).toFixed(1), note: r.note, hasTeam: !!u.teamId, quals: u.qual.map(q => ({ id: q, label: C.topicName(db, q) })), isInstructor: u.isInstructor, segs: Array.from({ length: 10 }, (_, i) => ({ id: i, bg: i < Math.round(u.teamId ? r.score : u.rating) ? 'var(--color-accent)' : 'var(--color-neutral-800)' })) }, myAtt, noMyAtt: myAtt.length === 0, prefs: [['evening', `תזכורת ערב לפני (${db.settings.eveningReminder})`], ['morning', 'בבוקר האימון — שעתיים לפני היציאה'], ['approved', 'כשהנוכחות שלי אושרה'], ['changed', 'כשאימון של הצוות שונה']].map(([k, label]) => ({ id: k, label, on: !!u.notif[k], toggle: this.toggleNotifPref(k) })), goLogistics: () => this.setState({ screen: 'logistics', notifOpen: false }), goArchive: () => this.setState({ screen: 'archive', notifOpen: false }), backHome: () => this.setState({ screen: null }), logout: () => this.logout() }; }
+  listVals(db, u, today) { const C = this.C;
+    const logi = C.activeTrainings(db).map(t => { const veh = {}; t.vehicles.forEach(v => { veh[v.type] = (veh[v.type] || 0) + 1; }); const ammo = t.ammo.reduce((s, a) => s + a.allocated, 0); const ret = t.gear.filter(g => g.returned).length; const canEdit = C.permsFor(db, u, t).canEdit;
+      return { id: t.id, code: `${C.trainingTitle(db, t)} · ${C.topicName(db, t.topicId)}`, date: `${C.dayLetter(t.date)} ${C.fmtShort(t.date)}`, vehicles: Object.entries(veh).map(([k, n]) => `${k} ×${n}`).join(' · ') || '—', ammo: ammo ? `${ammo.toLocaleString('en-US')} כד׳` : 'ללא תחמושת', food: t.food.map(f => `${f.name} ${f.qty}`).join(' · '), gearLabel: `ציוד ${ret}/${t.gear.length} הוחזר`, gear: t.gear.map(g => ({ id: g.id, label: `${g.name} ×${g.qty}`, returned: g.returned, cls: g.returned ? 'btn-primary' : 'btn-secondary', toggle: () => this.toggleReturned(t.id, g.id), canEdit, locked: !canEdit })), open: () => this.openTraining(t.id, 'mine') }; });
+    const arch = db.trainings.filter(t => t.status === 'done' || t.status === 'cancelled').sort((a, b) => b.date.localeCompare(a.date)).map(t => ({ id: t.id, code: `${C.trainingTitle(db, t)} · ${C.topicName(db, t.topicId)}`, date: C.fmtFull(t.date), status: C.TRAINING_STATUS[t.status], statusCls: t.status === 'done' ? 'tag-accent' : 'tag-outline', summary: t.summary.commander || t.cancelReason || 'ללא סיכום', open: () => this.openTraining(t.id, 'mine') }));
+    const first = C.activeTrainings(db)[0];
+    return { logi, arch, noArch: arch.length === 0, archEmpty: `הארכיון ריק — יתמלא כשיסתיים האימון הראשון${first ? ` (${C.fmtShort(first.date)})` : ''}` }; }
+  dialogVals(db, u) { const C = this.C; const d = this.state.dialog; if (!d) return { hasDialog: false }; const F = this.state.form; const norm = {}; Object.keys(F).forEach(k => { norm[k] = F[k] == null ? '' : F[k]; }); const S = {}; ['reason', 'name', 'rank', 'role', 'pn', 'phone', 'teamId'].forEach(k => { S[k] = this.setF(k); });
+    const t = d.tid ? C.byId(db.trainings, d.tid) : null;
+    return { hasDialog: true, F: norm, S, dlg: { isAttendance: d.type === 'attendance', isJoin: d.type === 'join', close: () => this.closeDialog(), stop: e => e.stopPropagation(), tTitle: t ? `${C.trainingTitle(db, t)} · ${C.topicName(db, t.topicId)} · ${C.fmtShort(t.date)}` : '', targetName: d.pid ? C.fullName(C.personById(db, d.pid)) : '', attOptions: C.ATT_STATUSES.map(s => ({ id: s.id, label: s.label, cls: F.status === s.id ? 'btn-primary' : 'btn-secondary', pick: () => this.setState(st => ({ form: { ...st.form, status: s.id } })) })), needsReason: !!F.status && F.status !== 'coming' && F.status !== 'late', saveAttendance: () => this.saveAttendance(), rankOpts: C.RANKS.map(r => ({ id: r, label: r })), roleOpts: C.ROLES.filter(r => r !== 'מפקד צוות').map(r => ({ id: r, label: r })), teamOpts: [{ id: 'a', label: db.teams.a.name }, { id: 'b', label: db.teams.b.name }], submitJoin: () => this.submitJoin() } }; }
+  // ── הרחבות לפני יציאה לאור (דורסות הגדרות קודמות) ──
+  componentDidMount() {
+    this.onSync = e => { if (e.detail && e.detail.source === this.iid) return; if (!this.C) return; const db = this.C.loadDB(); this.setState(s => ({ db, userId: db.settings.realMode ? s.userId : (this.C.loadSession() || s.userId) })); };
+    window.addEventListener('hapak:changed', this.onSync);
+    this._clock = setInterval(() => this.runAutomations(), 30000);
+    import('./hapak-core.js').then(m => { this.C = m; const db = m.loadDB(); m.setToday(this.today(), this.nowLabel()); const userId = db.settings.realMode ? null : m.loadSession(); this.setState({ ready: true, db, userId, selWeek: this.clampWeek(db, m.weekOf(this.today())) }, () => this.runAutomations()); }).catch(e => this.setState({ err: 'טעינת הנתונים נכשלה: ' + e.message }));
+  }
+  componentWillUnmount() { window.removeEventListener('hapak:changed', this.onSync); clearTimeout(this._tt); clearInterval(this._clock); }
+  nowLabel() { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+  runAutomations() { const db = this.state.db; if (!db || !this.C) return; if (this.C.runAutomations(db, this.today(), this.nowLabel())) { this.C.saveDB(db); this.C.broadcast(this.iid); } else this.C.setToday(this.today(), this.nowLabel()); this.forceUpdate(); }
+  today() { const d = this.props.demoDate; if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d; return this.C ? this.C.realToday() : '2026-09-07'; }
+  showDemo() { const db = this.state.db; return !!db && !db.settings.realMode && (this.props.showDemoUsers ?? true); }
+  pinVals(db) { const C = this.C; const st = this.state; const step = st.loginStep || 'pn'; const target = st.loginPid ? C.personById(db, st.loginPid) : null;
+    return { pinStage: step !== 'pn', pinConfirm: step === 'set', pinLabel: step === 'set' ? `שלום ${target ? C.fullName(target) : ''} — בחר קוד כניסה (4 ספרות)` : `קוד כניסה · ${target ? C.fullName(target) : ''}`, loginPin: st.loginPin || '', loginPin2: st.loginPin2 || '', setLoginPin: e => this.setState({ loginPin: e.target.value.replace(/\D/g, '').slice(0, 4), loginErr: '' }), setLoginPin2: e => this.setState({ loginPin2: e.target.value.replace(/\D/g, '').slice(0, 4), loginErr: '' }), loginBtn: step === 'set' ? 'שמור קוד והיכנס' : step === 'pin' ? 'כניסה' : 'המשך', loginBack: () => this.setState({ loginStep: 'pn', loginPid: null, loginPin: '', loginPin2: '', loginErr: '' }) }; }
+  submitLogin() { const { db } = this.state; const C = this.C; const step = this.state.loginStep || 'pn';
+    if (step === 'pn') { const pn = (this.state.loginPn || '').trim(); if (!/^\d{7}$/.test(pn)) return this.setState({ loginErr: 'מספר אישי חייב להיות 7 ספרות' }); const p = db.people.find(x => x.pn === pn); if (!p) return this.setState({ loginErr: this.allowJoin() ? 'המספר האישי לא רשום — רק מי שנוסף על ידי המנהל יכול להיכנס. אפשר לשלוח בקשת הצטרפות.' : 'המספר האישי לא רשום — פנה למנהל המערכת או למפקד החפ״ק.' }); if (p.status !== 'active') return this.setState({ loginErr: 'המשתמש מושבת זמנית — פנה למנהל המערכת.' }); return this.setState({ loginStep: p.pin ? 'pin' : 'set', loginPid: p.id, loginPin: '', loginPin2: '', loginErr: '' }); }
+    const p = C.personById(db, this.state.loginPid); if (!p) return this.setState({ loginStep: 'pn', loginPid: null }); const pin = this.state.loginPin || ''; if (!/^\d{4}$/.test(pin)) return this.setState({ loginErr: 'הקוד חייב להיות 4 ספרות' });
+    if (step === 'set') { if (pin !== (this.state.loginPin2 || '')) return this.setState({ loginErr: 'שני הקודים אינם זהים' }); if (/^(\d)\1{3}$/.test(pin) || pin === '1234') return this.setState({ loginErr: 'בחר קוד פחות צפוי' }); p.pin = C.hashPin(pin); p.pinSetAt = this.stamp(); this.commit(); this.loginAs(p.id); this.toast('הקוד נשמר'); return; }
+    if (C.hashPin(pin) !== p.pin) return this.setState({ loginErr: 'קוד שגוי. לאיפוס — מנהל המערכת או מפקד החפ״ק.', loginPin: '' });
+    this.loginAs(p.id); }
+  loginAs(pid) { const db = this.state.db; this.C.saveSession(db.settings.realMode ? null : pid); if (!db.settings.realMode) this.C.broadcast(this.iid); this.setState({ userId: pid, loginErr: '', loginPn: '', loginPin: '', loginPin2: '', loginStep: 'pn', loginPid: null, tab: 'schedule', screen: null, dialog: null }, () => this.runAutomations()); }
+  openFeedback(tid) { const t = this.C.byId(this.state.db.trainings, tid); const u = this.user(); const f = (t.feedback || {})[u.id] || {}; this.dialog('feedback', { tid }, { fbOverall: f.overall ? String(f.overall) : '', fbInstructor: f.instructor ? String(f.instructor) : '', fbLogistics: f.logistics ? String(f.logistics) : '', fbComment: f.comment || '' }); }
+  saveFeedback() { const { form: f, db, dialog: d } = this.state, C = this.C; const t = C.byId(db.trainings, d.tid); const u = this.user(); const n = v => Number(v) || 0; if (!n(f.fbOverall)) return this.toast('בחר דירוג כללי'); t.feedback = t.feedback || {}; t.feedback[u.id] = { overall: n(f.fbOverall), instructor: n(f.fbInstructor), logistics: n(f.fbLogistics), comment: (f.fbComment || '').trim(), time: this.stamp() }; this.commit({ dialog: null, form: {} }); this.toast('תודה — המשוב נשמר'); }
+  extraVals(db, u, today, t) { const C = this.C; const F = this.state.form; const d = this.state.dialog; const pickN = (k, n) => () => this.setState(s => ({ form: { ...s.form, [k]: String(n) } }));
+    const banners = C.bannerTrainings(db, u, today).map(x => { const mine = x.attendance[u.id]; const isPart = C.participants(db, x).some(p => p.id === u.id); return { id: x.id, when: x.date === today ? 'היום' : 'מחר', title: `${C.topicName(db, x.topicId)} · ${C.trainingTitle(db, x)}`, sub: `יציאה ${x.departure} מ${x.pickup} · ${x.location}`, canMark: isPart && !mine && today <= x.date, mark: () => this.openAttendance(x.id), open: () => this.openTraining(x.id, 'mine') }; });
+    const fb = t && t.feedback ? t.feedback[u.id] : null; const dt = d && d.tid ? C.byId(db.trainings, d.tid) : null;
+    return { periodName: db.settings.periodName, G: { banners, hasBanners: banners.length > 0, canGiveFeedback: !!t && t.status === 'done' && C.participants(db, t).some(p => p.id === u.id), myFeedback: fb ? `המשוב שלך: כללי ${fb.overall}/5 · מדריך ${fb.instructor || '—'}/5 · לוגיסטיקה ${fb.logistics || '—'}/5` : 'האימון הסתיים — נשמח למשוב קצר', fbBtn: fb ? 'עדכון משוב' : 'משוב על האימון', openFeedback: () => t && this.openFeedback(t.id), pendingSummary: !!t && C.isPendingSummary(t, today),
+      dlgx: { isFeedback: !!d && d.type === 'feedback', fbTitle: dt ? `${C.trainingTitle(db, dt)} · ${C.topicName(db, dt.topicId)}` : '', fbRows: [['fbOverall', 'דירוג כללי'], ['fbInstructor', 'המדריך'], ['fbLogistics', 'לוגיסטיקה']].map(([k, label]) => ({ id: k, label, opts: [1, 2, 3, 4, 5].map(n => ({ id: n, label: String(n), cls: String(F[k] || '') === String(n) ? 'btn-primary' : 'btn-secondary', pick: pickN(k, n) })) })), fbComment: F.fbComment || '', setFbComment: this.setF('fbComment'), save: () => this.saveFeedback() } } }; }
+  // @@MMETHODS
+}
+</script>
+</body>
+</html>

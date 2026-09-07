@@ -1,0 +1,59 @@
+/* hapak-theme.css — הרקע צבאי (מפת פיקוד: קווי גובה, רשת נצ״ד, זית כהה); התוכן עצמו ניטרלי-גרפיט עם אקצנט חול/פליז. */
+:root {
+  /* ground */
+  --color-bg: #141a0e;
+  --hapak-contours: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='720' viewBox='0 0 720 720' fill='none' stroke='%23a8b986' stroke-opacity='0.3' stroke-width='1.2'%3E%3Cpath d='M120 180C120 110 190 80 250 95C320 112 340 190 300 240C265 285 180 290 140 250C115 225 120 205 120 180Z'/%3E%3Cpath d='M150 180C150 130 200 110 245 120C295 132 310 190 280 225C255 255 190 258 160 230C143 215 150 198 150 180Z'/%3E%3Cpath d='M180 180C182 152 210 140 238 146C268 153 276 190 258 210C243 228 205 228 190 212C180 200 178 190 180 180Z'/%3E%3Cpath d='M400 480C395 400 470 350 545 365C620 380 660 450 640 520C620 590 540 620 470 590C420 568 403 530 400 480Z'/%3E%3Cpath d='M435 480C432 425 485 392 540 400C595 410 622 460 606 510C590 560 530 580 485 558C450 540 437 515 435 480Z'/%3E%3Cpath d='M470 480C470 450 500 432 535 438C570 445 585 478 574 506C563 533 525 540 500 525C480 513 471 498 470 480Z'/%3E%3Cpath d='M505 480C506 467 520 460 535 463C550 467 556 482 550 494C544 506 528 508 517 500C508 494 505 487 505 480Z'/%3E%3Cpath d='M500 150C500 110 540 85 585 92C630 100 650 145 635 185C620 225 570 240 535 220C510 205 500 180 500 150Z'/%3E%3Cpath d='M530 150C530 128 552 114 578 120C604 126 614 152 604 175C594 198 565 206 545 193C532 184 530 165 530 150Z'/%3E%3Cpath d='M100 560C100 520 140 495 185 505C230 515 250 560 232 600C214 640 160 650 128 625C106 608 100 585 100 560Z'/%3E%3Cpath d='M135 560C135 540 155 525 180 530C205 535 216 560 206 582C196 604 168 610 150 596C138 586 135 573 135 560Z'/%3E%3C/svg%3E");
+  --hapak-ground:
+    radial-gradient(120% 70% at 50% 0%, rgba(104, 132, 62, 0.42), transparent 62%),
+    var(--hapak-contours),
+    repeating-linear-gradient(90deg, rgba(236, 235, 228, 0.06) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(0deg, rgba(236, 235, 228, 0.06) 0 1px, transparent 1px 96px),
+    #141a0e;
+  --hapak-chrome: color-mix(in srgb, #0d1109 84%, transparent);
+
+  /* content — graphite, not green: surfaces clearly lighter than the ground */
+  --color-surface: #262824;
+  --color-text: #f3f2ec;
+  --color-divider: color-mix(in srgb, #f3f2ec 20%, transparent);
+
+  --color-neutral-100: #f7f6f2;
+  --color-neutral-200: #ebeae4;
+  --color-neutral-300: #d8d7cf;
+  --color-neutral-400: #bcbbb1;
+  --color-neutral-500: #9d9c93;
+  --color-neutral-600: #7d7c74;
+  --color-neutral-700: #5f5e57;
+  --color-neutral-800: #45443f;
+  --color-neutral-900: #33322e;
+
+  /* accent — חול / פליז, בהיר ורווי יותר */
+  --color-accent: #e2bb55;
+  --color-accent-100: #fdf8e8;
+  --color-accent-200: #f9ecc2;
+  --color-accent-300: #f1d98d;
+  --color-accent-400: #ebca6c;
+  --color-accent-500: #e2bb55;
+  --color-accent-600: #bd9a3d;
+  --color-accent-700: #91762e;
+  --color-accent-800: #675322;
+  --color-accent-900: #453717;
+
+  --color-accent-2: #e2bb55;
+  --color-accent-2-100: #fdf8e8;
+  --color-accent-2-200: #f9ecc2;
+  --color-accent-2-300: #f1d98d;
+  --color-accent-2-400: #ebca6c;
+  --color-accent-2-500: #e2bb55;
+  --color-accent-2-600: #bd9a3d;
+  --color-accent-2-700: #91762e;
+  --color-accent-2-800: #675322;
+  --color-accent-2-900: #453717;
+
+  --color-section: #23361c;
+  --color-section-glow: #2f4a26;
+  --color-section-ghost: #446838;
+}
+/* כרטיסים "מונחים" על המפה: קצה ברור וצל */
+.card:not(:focus-visible) { outline: 1px solid color-mix(in srgb, #f3f2ec 14%, transparent); outline-offset: -1px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42); }
+.btn-primary { background: color-mix(in srgb, #e2bb55 14%, transparent); }
+.tag-accent { background: color-mix(in srgb, #e2bb55 22%, transparent); }
