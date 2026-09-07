@@ -9,49 +9,120 @@ import { detectPlatform, isStandalone } from '@/lib/pwa';
  * Subscribes this device to Web Push so the evening and morning reminders
  * arrive even when the app is closed. One subscription per device.
  *
- * Every dead end says why out loud rather than disappearing: an iPhone that has
- * not been added to the Home Screen has no Push API at all, a blocked
+ * "Enabled" is a fact about the server, not about the browser. The browser
+ * keeps its subscription even when saving it here failed, which left the
+ * button saying notifications were on while nothing could ever be delivered —
+ * and the test push answering "no devices". So the check reads both sides and
+ * repairs the mismatch itself, and says out loud when it cannot.
+ *
+ * Every other dead end also says why rather than disappearing: an iPhone that
+ * has not been added to the Home Screen has no Push API at all, a blocked
  * permission cannot be re-asked from the page, and a deployment without VAPID
- * keys cannot subscribe anyone. Each of those looked identical before — a
- * button that quietly wasn't there.
+ * keys cannot subscribe anyone.
  */
-type State = 'loading' | 'off' | 'on' | 'busy' | 'blocked' | 'needs-install' | 'unsupported' | 'unconfigured';
+type State =
+  | 'loading'
+  | 'off'
+  | 'on'
+  | 'busy'
+  | 'blocked'
+  | 'needs-install'
+  | 'unsupported'
+  | 'unconfigured';
+
+interface SubJson {
+  endpoint?: string;
+  keys?: { p256dh: string; auth: string };
+}
 
 export function PushToggle() {
   const { user, toast } = useApp();
   const [state, setState] = useState<State>('loading');
+  const [devices, setDevices] = useState(0);
+  const [problem, setProblem] = useState('');
   const [testing, setTesting] = useState(false);
 
-  const detect = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
-      setState('unconfigured');
-      return;
-    }
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      // on iOS the Push API exists only once the app is on the Home Screen
-      setState(detectPlatform() === 'ios' && !isStandalone() ? 'needs-install' : 'unsupported');
-      return;
-    }
-    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
-      setState('blocked');
-      return;
-    }
-    navigator.serviceWorker.ready
-      .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setState(sub ? 'on' : 'off'))
-      .catch(() => setState('off'));
-  }, []);
+  const userId = user?.id;
 
-  useEffect(detect, [detect]);
+  /** Writes this browser's subscription to the server. Returns an error message. */
+  const save = useCallback(
+    async (sub: PushSubscription, personId: string): Promise<string> => {
+      const json = sub.toJSON() as SubJson;
+      if (!json.endpoint || !json.keys) return 'הדפדפן לא סיפק מנוי תקין להתראות';
+      const { error } = await supabase().from('push_subscriptions').upsert(
+        {
+          person_id: personId,
+          endpoint: json.endpoint,
+          p256dh: json.keys.p256dh,
+          auth: json.keys.auth,
+        },
+        { onConflict: 'endpoint' },
+      );
+      return error ? error.message : '';
+    },
+    [],
+  );
+
+  const detect = useCallback(async () => {
+    if (typeof window === 'undefined' || !userId) return;
+    setProblem('');
+
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return setState('unconfigured');
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window))
+      // on iOS the Push API exists only once the app is on the Home Screen
+      return setState(detectPlatform() === 'ios' && !isStandalone() ? 'needs-install' : 'unsupported');
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied')
+      return setState('blocked');
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+
+      const { count } = await supabase()
+        .from('push_subscriptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('person_id', userId);
+      setDevices(count ?? 0);
+
+      if (!sub) return setState('off');
+
+      // the browser is subscribed — make sure the server knows about it too
+      const { data: known } = await supabase()
+        .from('push_subscriptions')
+        .select('id')
+        .eq('endpoint', sub.endpoint)
+        .maybeSingle();
+
+      if (known) return setState('on');
+
+      const err = await save(sub, userId);
+      if (err) {
+        setProblem(err);
+        return setState('off');
+      }
+      setDevices((n) => n + 1);
+      setState('on');
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+      setState('off');
+    }
+  }, [userId, save]);
+
+  useEffect(() => {
+    void detect();
+  }, [detect]);
 
   if (!user) return null;
 
   const enable = async () => {
     setState('busy');
+    setProblem('');
     try {
       const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!key) throw new Error('התראות פוש לא מוגדרות בשרת');
+
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         setState(permission === 'denied' ? 'blocked' : 'off');
@@ -60,28 +131,23 @@ export function PushToggle() {
       }
 
       const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
-      });
-      const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh: string; auth: string } };
+      const sub =
+        (await reg.pushManager.getSubscription()) ??
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        }));
 
-      const { error } = await supabase().from('push_subscriptions').upsert(
-        {
-          person_id: user.id,
-          endpoint: json.endpoint!,
-          p256dh: json.keys!.p256dh,
-          auth: json.keys!.auth,
-        },
-        { onConflict: 'endpoint' },
-      );
-      if (error) throw new Error(error.message);
+      const err = await save(sub, user.id);
+      if (err) throw new Error(err);
 
-      setState('on');
+      await detect();
       toast('התראות מופעלות במכשיר הזה');
     } catch (e) {
+      const msg = e instanceof Error ? e.message : 'הפעלת ההתראות נכשלה';
+      setProblem(msg);
       setState('off');
-      toast(e instanceof Error ? e.message : 'הפעלת ההתראות נכשלה');
+      toast(msg);
     }
   };
 
@@ -94,7 +160,7 @@ export function PushToggle() {
         await supabase().from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
         await sub.unsubscribe();
       }
-      setState('off');
+      await detect();
       toast('ההתראות כובו במכשיר הזה');
     } catch {
       setState('off');
@@ -108,18 +174,22 @@ export function PushToggle() {
       const { data } = await supabase().auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error('ההתחברות פגה — היכנס מחדש');
+
       const res = await fetch('/api/push/test', {
         method: 'POST',
         headers: { authorization: `Bearer ${token}` },
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'שליחת הבדיקה נכשלה');
-      toast(
-        body.sent
-          ? `נשלחה התראת בדיקה ל-${body.sent} מכשירים — אמורה להופיע תוך שניות`
-          : 'לא נמצאו מכשירים רשומים — הפעל התראות במכשיר הזה',
-      );
-      if (!body.sent) detect();
+
+      if (body.sent) {
+        toast(`נשלחה התראת בדיקה ל-${body.sent} מכשירים — אמורה להופיע תוך שניות`);
+      } else {
+        // the server has no subscription for this person: re-register and retry
+        toast('המכשיר לא היה רשום בשרת — רושם אותו עכשיו');
+        await detect();
+        toast('נסה ״שלח התראת בדיקה״ שוב');
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'שליחת הבדיקה נכשלה');
     } finally {
@@ -132,7 +202,8 @@ export function PushToggle() {
   if (state === 'unconfigured')
     return (
       <Note>
-        התראות פוש עדיין לא הופעלו בשרת — מנהל המערכת צריך להוסיף את מפתחות ה-VAPID ב-Vercel.
+        התראות פוש עדיין לא הופעלו בשרת — מנהל המערכת צריך להוסיף את מפתחות ה-VAPID ב-Vercel
+        ולעשות Redeploy.
       </Note>
     );
 
@@ -177,9 +248,18 @@ export function PushToggle() {
           </button>
         )}
       </div>
+
       <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
-        נדרש פעם אחת בכל מכשיר. באייפון — רק לאחר הוספה למסך הבית.
+        {devices > 0
+          ? `${devices} מכשירים רשומים לחשבון שלך · נדרש פעם אחת בכל מכשיר`
+          : 'נדרש פעם אחת בכל מכשיר. באייפון — רק לאחר הוספה למסך הבית.'}
       </span>
+
+      {problem && (
+        <span style={{ fontSize: 11.5, color: 'var(--color-accent-300)', lineHeight: 1.6 }}>
+          רישום המכשיר בשרת נכשל: {problem}
+        </span>
+      )}
     </div>
   );
 }

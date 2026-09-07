@@ -20,11 +20,22 @@ export async function GET() {
     PIN_PEPPER: !!process.env.PIN_PEPPER,
     AUTH_DERIVE_SECRET: !!process.env.AUTH_DERIVE_SECRET,
     CRON_SECRET: !!process.env.CRON_SECRET,
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY: !!process.env.VAPID_PRIVATE_KEY,
   };
 
+  // push is optional, so its two keys are reported but never block startup
+  const OPTIONAL = ['NEXT_PUBLIC_VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'];
   const missing = Object.entries(env)
-    .filter(([, present]) => !present)
+    .filter(([name, present]) => !present && !OPTIONAL.includes(name))
     .map(([name]) => name);
+
+  const push = {
+    configured: env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY,
+    note: env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY
+      ? 'התראות פוש מוגדרות'
+      : 'התראות פוש לא מוגדרות — הוסף NEXT_PUBLIC_VAPID_PUBLIC_KEY ו-VAPID_PRIVATE_KEY ב-Vercel ועשה Redeploy',
+  };
 
   // The project host, so a URL pointing at the wrong project — or carrying a
   // stray /rest/v1/ path — is visible without exposing any key.
@@ -38,7 +49,7 @@ export async function GET() {
     /* not a valid URL at all */
   }
 
-  const context = { env, missing, projectHost, urlLooksRight };
+  const context = { env, missing, projectHost, urlLooksRight, push };
 
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json(
@@ -107,10 +118,15 @@ export async function GET() {
       );
     }
 
+    const { count: subs } = await db
+      .from('push_subscriptions')
+      .select('id', { count: 'exact', head: true });
+
     return NextResponse.json({
       ok: true,
       message: `הכול תקין — ${count} אנשים במערכת. אפשר להיכנס.`,
       people_count: count,
+      push_devices: subs ?? 0,
       ...context,
     });
   } catch (e) {
