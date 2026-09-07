@@ -482,7 +482,7 @@ export async function addVehicle(
 
 export async function setVehicleField(
   id: string,
-  key: 'tz' | 'driver_id' | 'seats' | 'departure' | 'fitness' | 'fault',
+  key: 'type' | 'tz' | 'driver_id' | 'seats' | 'departure' | 'fitness' | 'fault',
   value: string,
 ): Promise<void> {
   const patch: Record<string, unknown> =

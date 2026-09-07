@@ -1,6 +1,7 @@
 'use client';
 
 import type { NewAmmo, NewFood, NewGear, NewVehicle } from '@/lib/core/defaults';
+import { VehicleTypeSelect } from '@/components/VehicleTypeSelect';
 import { FITNESS_OPTIONS } from '@/lib/core/constants';
 import type { Db } from '@/lib/core/types';
 
@@ -140,15 +141,12 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
                 ))}
               </select>
             )}
-            <input
-              className="input"
-              list="hapak-vehicle-type-list"
-              placeholder="סוג"
+            <VehicleTypeSelect
+              label="סוג"
               value={v.type}
-              onChange={(e) =>
-                patch({ vehicles: replace(value.vehicles, i, { ...v, type: e.target.value }) })
-              }
-              style={{ width: 118 }}
+              types={db.vehicle_types}
+              onChange={(type) => patch({ vehicles: replace(value.vehicles, i, { ...v, type }) })}
+              style={{ width: 132 }}
             />
             <input
               className="input tabnum"
@@ -211,11 +209,6 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
             </select>
           </Row>
         ))}
-        <datalist id="hapak-vehicle-type-list">
-          {db.vehicle_types.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
       </Section>
 
       {/* ── תחמושת ── */}

@@ -6,6 +6,7 @@ import { Field } from '@/components/ui/bits';
 import { FITNESS_OPTIONS, FOOD_CATALOG } from '@/lib/core/constants';
 import { permsFor } from '@/lib/core/permissions';
 import { fullName, participants, personById } from '@/lib/core/selectors';
+import { VehicleTypeSelect } from '@/components/VehicleTypeSelect';
 import type { FleetVehicle, GearItem, TrainingFull } from '@/lib/core/types';
 import {
   addAmmo,
@@ -286,7 +287,18 @@ function VehiclesSection({
           <tbody>
             {t.vehicles.map((veh) => (
               <tr key={veh.id}>
-                <td>{veh.type}</td>
+                <td>
+                  {canEdit ? (
+                    <VehicleTypeSelect
+                      value={veh.type}
+                      types={types}
+                      onChange={(type) => void run(() => setVehicleField(veh.id, 'type', type))}
+                      style={{ width: 'auto', minWidth: 118, minHeight: 30, padding: '2px 8px' }}
+                    />
+                  ) : (
+                    veh.type
+                  )}
+                </td>
                 <td>
                   <input
                     className="input tabnum"

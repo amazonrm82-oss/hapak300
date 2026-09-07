@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleTypeSelect } from '@/components/VehicleTypeSelect';
 import { SectionCard } from '@/components/ui/bits';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { FITNESS_OPTIONS } from '@/lib/core/constants';
@@ -150,17 +151,7 @@ export function FleetCard() {
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
               סוג
-              <input
-                className="input"
-                list="hapak-vehicle-types"
-                value={f.type}
-                onChange={(e) => setF({ ...f, type: e.target.value })}
-              />
-              <datalist id="hapak-vehicle-types">
-                {types.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
+              <VehicleTypeSelect value={f.type} types={types} onChange={(type) => setF({ ...f, type })} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
               מקומות
