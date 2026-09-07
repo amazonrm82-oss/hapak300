@@ -45,11 +45,25 @@ export async function POST(request: Request) {
   const locked = await lockoutMessage(db, pn);
   if (locked) return NextResponse.json({ error: locked }, { status: 429 });
 
-  const { data: person } = await db
+  const { data: person, error: lookupError } = await db
     .from('people')
     .select('id, name, rank, status, pin_hash')
     .eq('pn', pn)
     .maybeSingle();
+
+  // A failed lookup is not the same as an unknown person. Reporting "not
+  // registered" for a broken connection sent the last setup down the wrong
+  // path entirely — almost always it is a wrong or missing service-role key.
+  if (lookupError) {
+    console.error('auth-login lookup failed:', lookupError);
+    return NextResponse.json(
+      {
+        error:
+          'השרת לא הצליח לקרוא את רשימת הלוחמים. בדוק את SUPABASE_SERVICE_ROLE_KEY ב-Vercel — פתח /api/health לאבחון.',
+      },
+      { status: 500 },
+    );
+  }
 
   if (!person) {
     const { data: settings } = await db.from('settings').select('allow_join').maybeSingle();
