@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
-import { admin, anon } from '@/lib/server/admin';
+import { admin, anon, withinRate } from '@/lib/server/admin';
 
 /**
  * Sends a test push to the caller's own devices, and only to those.
@@ -31,6 +31,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'ההתחברות פגה — היכנס מחדש' }, { status: 401 });
 
   const db = admin();
+
+  if (!(await withinRate(db, `pushtest:${personId}`, 10, 600)))
+    return NextResponse.json(
+      { error: 'נשלחו יותר מדי בדיקות. נסה שוב בעוד כמה דקות.' },
+      { status: 429 },
+    );
+
   const { data: subs } = await db
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')

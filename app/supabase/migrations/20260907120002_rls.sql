@@ -473,9 +473,20 @@ create policy calendar_write on calendar_events for all to authenticated
 -- ── notifications ──────────────────────────────────────────────────────────
 create policy notifications_read on notifications for select to authenticated
   using ("to" is null or me_id() = any ("to"));
--- anyone whose actions notify others (commanders, instructors) may write one
+-- Writing a notification is speaking with the unit's voice — it lands in
+-- everyone's bell and, once push is on, on their lock screens. Only someone
+-- who commands the thing being announced may do it: an administrator, a team
+-- commander, or the commander or instructor of that particular training.
+-- `me_id() is not null` used to be the last clause here, which made this true
+-- for every logged-in fighter: anyone could have announced a cancellation to
+-- the whole unit.
 create policy notifications_insert on notifications for insert to authenticated
-  with check (is_admin() or is_team_cmd() or is_instructor() or me_id() is not null);
+  with check (
+    is_admin()
+    or is_team_cmd()
+    or (training_id is not null
+        and (is_training_cmd(training_id) or is_training_instr(training_id)))
+  );
 
 create policy reads_read on notification_reads for select to authenticated
   using (person_id = me_id());

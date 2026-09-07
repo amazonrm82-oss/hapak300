@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
   admin,
+  callerKey,
   clearFailures,
   lockoutMessage,
   mintSession,
   recordFailure,
+  withinRate,
 } from '@/lib/server/admin';
 import { verifyPin } from '@/lib/server/pin';
 
@@ -41,6 +43,15 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  // The per-account lock below stops someone guessing one fighter's code. This
+  // stops someone walking the 7-digit space from one machine to find out which
+  // numbers belong to real people.
+  if (!(await withinRate(db, `login:${callerKey(request)}`, 40, 600)))
+    return NextResponse.json(
+      { error: 'יותר מדי ניסיונות מהמכשיר הזה. נסה שוב בעוד כמה דקות.' },
+      { status: 429 },
+    );
 
   const locked = await lockoutMessage(db, pn);
   if (locked) return NextResponse.json({ error: locked }, { status: 429 });
@@ -81,13 +92,13 @@ export async function POST(request: Request) {
   if (person.status !== 'active')
     return NextResponse.json({ error: 'המשתמש מושבת זמנית — פנה למנהל המערכת.' }, { status: 403 });
 
-  const who = `${person.rank} ${person.name}`;
-
-  // first login: no code chosen yet
-  if (!person.pin_hash) return NextResponse.json({ stage: 'set-pin', name: who });
+  // The rank and name are not returned here. Answering "who is 8409505?" to
+  // anyone who asks turns the login screen into a roster of the unit, readable
+  // by anyone with the address. The greeting waits until the code checks out.
+  if (!person.pin_hash) return NextResponse.json({ stage: 'set-pin' });
 
   // the personal number checked out; now ask for the code
-  if (!/^\d{4}$/.test(pin)) return NextResponse.json({ stage: 'pin', name: who });
+  if (!/^\d{4}$/.test(pin)) return NextResponse.json({ stage: 'pin' });
 
   if (!(await verifyPin(pin, person.pin_hash))) {
     await recordFailure(db, pn);

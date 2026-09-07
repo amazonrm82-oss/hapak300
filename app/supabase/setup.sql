@@ -895,9 +895,20 @@ create policy calendar_write on calendar_events for all to authenticated
 -- ── notifications ──────────────────────────────────────────────────────────
 create policy notifications_read on notifications for select to authenticated
   using ("to" is null or me_id() = any ("to"));
--- anyone whose actions notify others (commanders, instructors) may write one
+-- Writing a notification is speaking with the unit's voice — it lands in
+-- everyone's bell and, once push is on, on their lock screens. Only someone
+-- who commands the thing being announced may do it: an administrator, a team
+-- commander, or the commander or instructor of that particular training.
+-- `me_id() is not null` used to be the last clause here, which made this true
+-- for every logged-in fighter: anyone could have announced a cancellation to
+-- the whole unit.
 create policy notifications_insert on notifications for insert to authenticated
-  with check (is_admin() or is_team_cmd() or is_instructor() or me_id() is not null);
+  with check (
+    is_admin()
+    or is_team_cmd()
+    or (training_id is not null
+        and (is_training_cmd(training_id) or is_training_instr(training_id)))
+  );
 
 create policy reads_read on notification_reads for select to authenticated
   using (person_id = me_id());
@@ -987,6 +998,45 @@ end $$;
 
 create trigger join_requests_notify after insert on join_requests
   for each row execute function notify_join_request();
+
+-- The request comes from an anonymous caller, so the form is reachable by
+-- anyone holding the public key. Without a ceiling, a script could bury the
+-- leadership under thousands of requests — and now under thousands of pushes.
+create or replace function guard_join_request() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare pending int;
+begin
+  if new.pn !~ '^[0-9]{7}$' then
+    raise exception 'מספר אישי חייב להיות 7 ספרות';
+  end if;
+  if length(btrim(new.name)) < 2 then
+    raise exception 'נדרש שם מלא';
+  end if;
+  -- One message for both "already a member" and "already applied". Telling
+  -- them apart would turn this open form into a way of asking whether a given
+  -- personal number belongs to someone in the unit.
+  if exists (select 1 from people where pn = new.pn)
+     or exists (select 1 from join_requests where pn = new.pn and status = 'pending') then
+    raise exception 'לא ניתן לשלוח בקשה עבור המספר האישי הזה כרגע. אם כבר יש לך גישה — היכנס עם המספר האישי שלך.';
+  end if;
+
+  select count(*) into pending from join_requests where status = 'pending';
+  if pending >= 100 then
+    raise exception 'יש יותר מדי בקשות ממתינות. פנה למנהל המערכת.';
+  end if;
+
+  -- a burst from one source: ten new requests in an hour is already unusual
+  if (select count(*) from join_requests where at > now() - interval '1 hour') >= 10 then
+    raise exception 'נשלחו יותר מדי בקשות בזמן קצר. נסה שוב בעוד שעה.';
+  end if;
+
+  new.name := btrim(new.name);
+  new.phone := btrim(new.phone);
+  return new;
+end $$;
+
+create trigger join_requests_guard before insert on join_requests
+  for each row execute function guard_join_request();
 
 -- ── final attendance approval ──────────────────────────────────────────────
 -- Anyone who never responded is recorded as 'absent' with `auto`, exactly as
@@ -1371,9 +1421,13 @@ grant execute on function
   invite_person(uuid, text, uuid), respond_invite(uuid, text, boolean),
   create_trainings(jsonb, boolean), shift_schedule(int),
   mark_chat_read(uuid), mark_notifications_read(), approve_join_request(uuid, boolean),
-  notify(text, uuid[], uuid, text),
   me_id(), is_admin(), is_team_cmd(), can_see_pn()
 to authenticated;
+
+-- `notify` is SECURITY DEFINER and writes straight into `notifications`,
+-- bypassing the policy that decides who may announce something. It exists for
+-- the other definer functions to call; nobody calls it from the browser.
+revoke execute on function notify(text, uuid[], uuid, text) from authenticated, anon, public;
 
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
@@ -1393,6 +1447,40 @@ create table login_attempts (
   last_try   timestamptz not null default now()
 );
 alter table login_attempts enable row level security;  -- service role only
+
+-- A per-account lock stops someone guessing one fighter's code. It does not
+-- stop someone walking the whole 7-digit space from one machine, learning which
+-- numbers exist. This is the ceiling for that: counted per caller, not per
+-- account, and written only by the server routes.
+create table rate_limits (
+  key       text primary key,
+  hits      int not null default 0,
+  window_at timestamptz not null default now()
+);
+alter table rate_limits enable row level security;  -- service role only
+
+-- Returns true while the caller is still inside their allowance. One statement,
+-- so two requests arriving together cannot both read the same count.
+create or replace function bump_rate_limit(k text, max_hits int, window_seconds int)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare cur rate_limits;
+begin
+  insert into rate_limits (key, hits, window_at) values (k, 1, now())
+  on conflict (key) do update set
+    hits = case when rate_limits.window_at < now() - make_interval(secs => window_seconds)
+                then 1 else rate_limits.hits + 1 end,
+    window_at = case when rate_limits.window_at < now() - make_interval(secs => window_seconds)
+                then now() else rate_limits.window_at end
+  returning * into cur;
+
+  -- keep the table from growing without bound; the rows are worthless once cold
+  delete from rate_limits where window_at < now() - interval '1 day';
+
+  return cur.hits <= max_hits;
+end $$;
+
+grant execute on function bump_rate_limit(text, int, int) to service_role;
 
 -- Clearing the PIN sends the fighter back through "choose a code" on next login.
 create or replace function reset_pin(pid uuid)

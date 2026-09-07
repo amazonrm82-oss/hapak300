@@ -322,3 +322,72 @@ select case when not exists (
 select case when (select n.text from notifications n where n.text like 'בקשת הצטרפות חדשה%' limit 1)
               like '%אורי בקשה%7999999%'
             then '✅' else '❌' end || '  46  ההתראה נושאת שם, תפקיד ומספר אישי';
+
+-- ════════ SPEAKING WITH THE UNIT'S VOICE ════════
+-- A notification lands in everyone's bell and on their lock screen. Only
+-- someone who commands the thing being announced may write one.
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$ begin
+  insert into notifications (text, "to") values ('האימון מחר בוטל', null);
+  raise notice '❌  47  לוחם שלח הודעה לכל היחידה — כשל אבטחה';
+exception when others then
+  raise notice '✅  47  לוחם נחסם משליחת התראה ליחידה';
+end $t$;
+
+do $t$ begin
+  perform notify('עקיפה דרך הפונקציה', null, null, 'general');
+  raise notice '❌  48  לוחם קרא ל-notify ישירות — כשל אבטחה';
+exception when others then
+  raise notice '✅  48  הפונקציה notify אינה זמינה ללוחם';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- the team commander announcing their own training is exactly what it is for
+set request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+set role authenticated;
+do $t$ begin
+  insert into notifications (text, "to", training_id)
+  values ('שינוי בשעת היציאה', null, (select id from trainings limit 1));
+  raise notice '✅  49  מפקד צוות שולח התראה על האימון שלו';
+exception when others then
+  raise notice '❌  49  מפקד צוות נחסם משליחת התראה — %', sqlerrm;
+end $t$;
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ THE OPEN JOIN FORM CANNOT BE USED AS A FIREHOSE ════════
+do $t$ begin
+  insert into join_requests (name, rank, role, pn, phone, team_id)
+  values ('כפילות', 'סמל', 'מאבטח', '7999999', '', 'b');
+  raise notice '❌  50  בקשה כפולה התקבלה';
+exception when others then
+  raise notice '✅  50  בקשה כפולה נדחית';
+end $t$;
+
+do $t$ begin
+  insert into join_requests (name, rank, role, pn, phone, team_id)
+  values ('כבר במערכת', 'סמל', 'מאבטח', '8409505', '', 'b');
+  raise notice '❌  51  בקשה עבור מספר אישי קיים התקבלה';
+exception when others then
+  raise notice '✅  51  בקשה עבור מספר אישי שכבר במערכת נדחית';
+end $t$;
+
+do $t$ begin
+  insert into join_requests (name, rank, role, pn, phone, team_id)
+  values ('קצר', 'סמל', 'מאבטח', '123', '', 'b');
+  raise notice '❌  52  מספר אישי לא תקין התקבל';
+exception when others then
+  raise notice '✅  52  מספר אישי לא תקין נדחה';
+end $t$;
+
+-- ════════ THE RATE LIMITER ════════
+select case when bump_rate_limit('test:key', 3, 600)
+             and bump_rate_limit('test:key', 3, 600)
+             and bump_rate_limit('test:key', 3, 600)
+            then '✅' else '❌' end || '  53  שלוש הפניות הראשונות מותרות';
+select case when not bump_rate_limit('test:key', 3, 600)
+            then '✅' else '❌' end || '  54  הפנייה הרביעית נחסמת';
+select case when bump_rate_limit('test:other', 3, 600)
+            then '✅' else '❌' end || '  55  מגבלה נספרת בנפרד לכל קורא';

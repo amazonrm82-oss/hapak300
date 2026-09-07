@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -40,7 +41,8 @@ async function run(request: Request) {
 
   const auth = request.headers.get('authorization') ?? '';
   const provided = auth.replace(/^Bearer\s+/i, '').trim();
-  if (provided !== secret) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!sameSecret(provided, secret))
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const db = admin();
   const now = new Date();
@@ -51,6 +53,14 @@ async function run(request: Request) {
   const pushed = await deliverPush(db);
 
   return NextResponse.json({ ok: true, today, now: clock, created, pushed });
+}
+
+/** Constant-time comparison, so a wrong guess reveals nothing by how long it took. */
+function sameSecret(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  if (x.length !== y.length) return false;
+  return timingSafeEqual(x, y);
 }
 
 // ── reminders ──────────────────────────────────────────────────────────────

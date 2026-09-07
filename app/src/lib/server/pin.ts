@@ -56,6 +56,27 @@ export function authPassword(personId: string): string {
 export const syntheticEmail = (pn: string) => `${pn}@hapak300.local`;
 
 /** Blocks the obvious codes: 1234 and any repeated digit. */
+/**
+ * Four digits is 10,000 possibilities, and people do not pick from them evenly:
+ * a handful of codes cover a large share of every real-world sample. Blocking
+ * them costs a fighter nothing and removes the guesses an attacker would make
+ * first — which matters here, because five tries are allowed before the lock.
+ */
+const COMMON_PINS = new Set([
+  '1234', '1111', '0000', '1212', '7777', '1004', '2000', '4444', '2222', '6969',
+  '9999', '3333', '5555', '6666', '1122', '1313', '8888', '4321', '2001', '1010',
+  '1230', '2580', '0852', '1235', '9876', '1998', '1999', '2020', '2021', '2022',
+  '2023', '2024', '2025',
+]);
+
 export function isWeakPin(pin: string): boolean {
-  return pin === '1234' || /^(\d)\1{3}$/.test(pin);
+  if (COMMON_PINS.has(pin)) return true;
+  if (/^(\d)\1{3}$/.test(pin)) return true; // 0000, 7777 …
+  // four in a row, up or down: 2345, 8765
+  const d = pin.split('').map(Number);
+  const step = d[1] - d[0];
+  if ((step === 1 || step === -1) && d[2] - d[1] === step && d[3] - d[2] === step) return true;
+  // two repeated pairs: 1212, 4545
+  if (d[0] === d[2] && d[1] === d[3]) return true;
+  return false;
 }

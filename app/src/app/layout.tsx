@@ -19,6 +19,15 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'כשירות חפ״ק' },
 };
 
+/**
+ * Rendered per request rather than prerendered, so the Content-Security-Policy
+ * nonce from the middleware reaches Next's own inline scripts. A prerendered
+ * page carries no nonce, and the policy would block every script on it.
+ * Nothing here is static anyway — every screen is a client component reading
+ * live unit data.
+ */
+export const dynamic = 'force-dynamic';
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,

@@ -22,6 +22,15 @@
 --
 --  5. בקשת הצטרפות — מעכשיו קופצת כהתראה למנהל המערכת ולמפקד החפ״ק ברגע
 --     שהיא נשלחת, ולא רק מחכה במסך ״צוותים״.
+--
+--  6. חיזוק אבטחה:
+--     · כתיבת התראה שמורה למי שמפקד על מה שמכריזים עליו. עד היום כל לוחם
+--       מחובר יכול היה לשלוח ״האימון בוטל״ לכל היחידה.
+--     · הפונקציה notify כבר אינה נגישה מהדפדפן — היא עקפה את אותה בדיקה.
+--     · טופס ההצטרפות הפתוח מוגבל: בקשה כפולה, מספר אישי קיים, מספר לא תקין
+--       או הצפה נדחים.
+--     · מגבלת קצב לכל קורא, שבה משתמשים מסלולי הכניסה — כדי שאי אפשר יהיה
+--       לסרוק מספרים אישיים ממכשיר אחד.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -358,3 +367,95 @@ end $$;
 drop trigger if exists join_requests_notify on join_requests;
 create trigger join_requests_notify after insert on join_requests
   for each row execute function notify_join_request();
+
+
+-- ── 6. חיזוק אבטחה ────────────────────────────────────────────────────────
+
+-- כתיבת התראה היא דיבור בשם היחידה: ההודעה נוחתת אצל כולם, ועם פוש — גם על
+-- מסך הנעילה. עד כה הסעיף האחרון במדיניות היה `me_id() is not null`, כלומר
+-- נכון עבור כל לוחם מחובר.
+drop policy if exists notifications_insert on notifications;
+create policy notifications_insert on notifications for insert to authenticated
+  with check (
+    is_admin()
+    or is_team_cmd()
+    or (training_id is not null
+        and (is_training_cmd(training_id) or is_training_instr(training_id)))
+  );
+
+-- notify היא SECURITY DEFINER וכותבת ישירות לטבלה, כלומר עוקפת את המדיניות
+-- שלמעלה. היא נועדה לשימוש הפונקציות האחרות בלבד.
+revoke execute on function notify(text, uuid[], uuid, text) from authenticated, anon, public;
+
+
+create or replace function guard_join_request() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare pending int;
+begin
+  if new.pn !~ '^[0-9]{7}$' then
+    raise exception 'מספר אישי חייב להיות 7 ספרות';
+  end if;
+  if length(btrim(new.name)) < 2 then
+    raise exception 'נדרש שם מלא';
+  end if;
+  -- One message for both "already a member" and "already applied". Telling
+  -- them apart would turn this open form into a way of asking whether a given
+  -- personal number belongs to someone in the unit.
+  if exists (select 1 from people where pn = new.pn)
+     or exists (select 1 from join_requests where pn = new.pn and status = 'pending') then
+    raise exception 'לא ניתן לשלוח בקשה עבור המספר האישי הזה כרגע. אם כבר יש לך גישה — היכנס עם המספר האישי שלך.';
+  end if;
+
+  select count(*) into pending from join_requests where status = 'pending';
+  if pending >= 100 then
+    raise exception 'יש יותר מדי בקשות ממתינות. פנה למנהל המערכת.';
+  end if;
+
+  -- a burst from one source: ten new requests in an hour is already unusual
+  if (select count(*) from join_requests where at > now() - interval '1 hour') >= 10 then
+    raise exception 'נשלחו יותר מדי בקשות בזמן קצר. נסה שוב בעוד שעה.';
+  end if;
+
+  new.name := btrim(new.name);
+  new.phone := btrim(new.phone);
+  return new;
+end $$;
+
+drop trigger if exists join_requests_guard on join_requests;
+create trigger join_requests_guard before insert on join_requests
+  for each row execute function guard_join_request();
+
+-- מגבלת קצב לכל קורא. הנעילה לפי חשבון מונעת ניחוש קוד של לוחם אחד; זו
+-- מונעת סריקה של כל מרחב המספרים האישיים ממכשיר אחד.
+create table if not exists rate_limits (
+  key       text primary key,
+  hits      int not null default 0,
+  window_at timestamptz not null default now()
+);
+alter table rate_limits enable row level security;  -- service role only
+
+-- Returns true while the caller is still inside their allowance. One statement,
+-- so two requests arriving together cannot both read the same count.
+create or replace function bump_rate_limit(k text, max_hits int, window_seconds int)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare cur rate_limits;
+begin
+  insert into rate_limits (key, hits, window_at) values (k, 1, now())
+  on conflict (key) do update set
+    hits = case when rate_limits.window_at < now() - make_interval(secs => window_seconds)
+                then 1 else rate_limits.hits + 1 end,
+    window_at = case when rate_limits.window_at < now() - make_interval(secs => window_seconds)
+                then now() else rate_limits.window_at end
+  returning * into cur;
+
+  -- keep the table from growing without bound; the rows are worthless once cold
+  delete from rate_limits where window_at < now() - interval '1 day';
+
+  return cur.hits <= max_hits;
+end $$;
+
+grant execute on function bump_rate_limit(text, int, int) to service_role;
+
+-- לבדיקה:
+--   select bump_rate_limit('check', 2, 60);   -- true, true, ואז false

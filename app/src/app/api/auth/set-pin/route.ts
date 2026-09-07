@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { admin, clearFailures, mintSession } from '@/lib/server/admin';
+import { admin, callerKey, clearFailures, mintSession, withinRate } from '@/lib/server/admin';
 import { hashPin, isWeakPin } from '@/lib/server/pin';
 
 /**
@@ -42,6 +42,12 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  if (!(await withinRate(db, `setpin:${callerKey(request)}`, 15, 3600)))
+    return NextResponse.json(
+      { error: 'יותר מדי ניסיונות מהמכשיר הזה. נסה שוב בעוד שעה.' },
+      { status: 429 },
+    );
 
   const { data: person } = await db
     .from('people')

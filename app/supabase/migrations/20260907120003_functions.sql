@@ -52,6 +52,45 @@ end $$;
 create trigger join_requests_notify after insert on join_requests
   for each row execute function notify_join_request();
 
+-- The request comes from an anonymous caller, so the form is reachable by
+-- anyone holding the public key. Without a ceiling, a script could bury the
+-- leadership under thousands of requests — and now under thousands of pushes.
+create or replace function guard_join_request() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare pending int;
+begin
+  if new.pn !~ '^[0-9]{7}$' then
+    raise exception 'מספר אישי חייב להיות 7 ספרות';
+  end if;
+  if length(btrim(new.name)) < 2 then
+    raise exception 'נדרש שם מלא';
+  end if;
+  -- One message for both "already a member" and "already applied". Telling
+  -- them apart would turn this open form into a way of asking whether a given
+  -- personal number belongs to someone in the unit.
+  if exists (select 1 from people where pn = new.pn)
+     or exists (select 1 from join_requests where pn = new.pn and status = 'pending') then
+    raise exception 'לא ניתן לשלוח בקשה עבור המספר האישי הזה כרגע. אם כבר יש לך גישה — היכנס עם המספר האישי שלך.';
+  end if;
+
+  select count(*) into pending from join_requests where status = 'pending';
+  if pending >= 100 then
+    raise exception 'יש יותר מדי בקשות ממתינות. פנה למנהל המערכת.';
+  end if;
+
+  -- a burst from one source: ten new requests in an hour is already unusual
+  if (select count(*) from join_requests where at > now() - interval '1 hour') >= 10 then
+    raise exception 'נשלחו יותר מדי בקשות בזמן קצר. נסה שוב בעוד שעה.';
+  end if;
+
+  new.name := btrim(new.name);
+  new.phone := btrim(new.phone);
+  return new;
+end $$;
+
+create trigger join_requests_guard before insert on join_requests
+  for each row execute function guard_join_request();
+
 -- ── final attendance approval ──────────────────────────────────────────────
 -- Anyone who never responded is recorded as 'absent' with `auto`, exactly as
 -- the unit decided: "מי שלא הגיב נחשב לא מגיע".
@@ -435,6 +474,10 @@ grant execute on function
   invite_person(uuid, text, uuid), respond_invite(uuid, text, boolean),
   create_trainings(jsonb, boolean), shift_schedule(int),
   mark_chat_read(uuid), mark_notifications_read(), approve_join_request(uuid, boolean),
-  notify(text, uuid[], uuid, text),
   me_id(), is_admin(), is_team_cmd(), can_see_pn()
 to authenticated;
+
+-- `notify` is SECURITY DEFINER and writes straight into `notifications`,
+-- bypassing the policy that decides who may announce something. It exists for
+-- the other definer functions to call; nobody calls it from the browser.
+revoke execute on function notify(text, uuid[], uuid, text) from authenticated, anon, public;

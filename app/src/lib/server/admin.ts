@@ -28,6 +28,41 @@ export function anon(): SupabaseClient {
 export const MAX_FAILURES = 5;
 export const LOCK_MINUTES = 15;
 
+/**
+ * Who is calling, as well as we can tell behind Vercel's proxy. Only ever used
+ * as a rate-limit key — never stored with anything that identifies a person.
+ */
+export function callerKey(request: Request): string {
+  const fwd = request.headers.get('x-forwarded-for') ?? '';
+  const ip = fwd.split(',')[0].trim() || request.headers.get('x-real-ip') || 'unknown';
+  return ip.slice(0, 64);
+}
+
+/**
+ * True while the caller is still inside their allowance for `key`.
+ *
+ * Fails open on a database error: a rate limiter that locks everyone out when
+ * it breaks is worse than the abuse it prevents, and the per-account lock is
+ * still in place underneath.
+ */
+export async function withinRate(
+  db: SupabaseClient,
+  key: string,
+  maxHits: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  const { data, error } = await db.rpc('bump_rate_limit', {
+    k: key,
+    max_hits: maxHits,
+    window_seconds: windowSeconds,
+  });
+  if (error) {
+    console.error('rate limit check failed:', error.message);
+    return true;
+  }
+  return data !== false;
+}
+
 /** A Hebrew message while the account is locked out, otherwise null. */
 export async function lockoutMessage(db: SupabaseClient, pn: string): Promise<string | null> {
   const { data } = await db.from('login_attempts').select('locked_until').eq('pn', pn).maybeSingle();

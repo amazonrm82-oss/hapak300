@@ -10,8 +10,14 @@ import {
 } from './selectors';
 import type { Db, TrainingFull } from './types';
 
+// Quotes are escaped too: this output is also read inside attributes, and a
+// name or a location is text the unit types, not text we control.
 const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch] as string);
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (ch) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] as string,
+  );
 
 const rows = (arr: unknown[][]) =>
   arr.map((r) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('');
@@ -138,7 +144,7 @@ export function printHTML(title: string, bodyHTML: string): boolean {
       `h2{font-size:15px;color:#555;margin:0 0 16px;font-weight:400}table{border-collapse:collapse;width:100%;font-size:13px}` +
       `th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f2f2f2}` +
       `.muted{color:#666;font-size:12px;margin-top:18px}</style></head><body>${bodyHTML}` +
-      `<p class="muted">הופק מ-${title} · ${new Date().toLocaleString('he-IL')}</p></body></html>`,
+      `<p class="muted">הופק מ-${esc(title)} · ${new Date().toLocaleString('he-IL')}</p></body></html>`,
   );
   w.document.close();
   setTimeout(() => {

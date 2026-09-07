@@ -12,6 +12,40 @@ create table login_attempts (
 );
 alter table login_attempts enable row level security;  -- service role only
 
+-- A per-account lock stops someone guessing one fighter's code. It does not
+-- stop someone walking the whole 7-digit space from one machine, learning which
+-- numbers exist. This is the ceiling for that: counted per caller, not per
+-- account, and written only by the server routes.
+create table rate_limits (
+  key       text primary key,
+  hits      int not null default 0,
+  window_at timestamptz not null default now()
+);
+alter table rate_limits enable row level security;  -- service role only
+
+-- Returns true while the caller is still inside their allowance. One statement,
+-- so two requests arriving together cannot both read the same count.
+create or replace function bump_rate_limit(k text, max_hits int, window_seconds int)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare cur rate_limits;
+begin
+  insert into rate_limits (key, hits, window_at) values (k, 1, now())
+  on conflict (key) do update set
+    hits = case when rate_limits.window_at < now() - make_interval(secs => window_seconds)
+                then 1 else rate_limits.hits + 1 end,
+    window_at = case when rate_limits.window_at < now() - make_interval(secs => window_seconds)
+                then now() else rate_limits.window_at end
+  returning * into cur;
+
+  -- keep the table from growing without bound; the rows are worthless once cold
+  delete from rate_limits where window_at < now() - interval '1 day';
+
+  return cur.hits <= max_hits;
+end $$;
+
+grant execute on function bump_rate_limit(text, int, int) to service_role;
+
 -- Clearing the PIN sends the fighter back through "choose a code" on next login.
 create or replace function reset_pin(pid uuid)
 returns void
