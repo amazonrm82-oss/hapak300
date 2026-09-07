@@ -1,0 +1,284 @@
+/**
+ * Domain types. Field names are the database's (snake_case) so rows coming back
+ * from Supabase are usable as-is — there is no mapping layer to drift out of sync.
+ */
+
+export type TeamKey = 'a' | 'b';
+export type TrainingTeam = TeamKey | 'joint';
+export type PersonStatus = 'active' | 'inactive';
+export type TrainingStatus = 'planned' | 'published' | 'done' | 'cancelled';
+export type InviteStatus = 'pending' | 'accepted' | 'declined';
+export type AttStatus = 'coming' | 'late' | 'absent' | 'sick' | 'reserve' | 'other';
+export type Fitness = 'כשיר' | 'טעון בדיקה' | 'מושבת';
+export type CertType = 'fire' | 'drive' | 'medic' | 'comms' | 'mildrive' | 'medical';
+export type InviteRole = 'instructor' | 'commander';
+
+export interface NotifPrefs {
+  evening: boolean;
+  morning: boolean;
+  approved: boolean;
+  changed: boolean;
+}
+
+export interface Settings {
+  app_name: string;
+  unit_name: string;
+  brigade_commander: string;
+  period_start: string; // ISO date, a Sunday
+  period_name: string;
+  real_mode: boolean;
+  allow_join: boolean;
+  min_attendance: number;
+  essential_roles: string[];
+  invite_hours: number;
+  evening_reminder: string; // HH:MM
+  morning_reminder_before: number; // minutes
+  approval_window_hours: number;
+  cert_alert_days: number;
+  summary_lock_days: number;
+}
+
+export interface Team {
+  id: TeamKey;
+  name: string;
+  commander_id: string | null;
+}
+
+export interface Topic {
+  id: string;
+  name: string;
+  safety: string;
+  sort: number;
+}
+
+export interface Person {
+  id: string;
+  team_id: TeamKey | null;
+  rank: string;
+  name: string;
+  role: string;
+  pn: string; // masked to '' for viewers without `seesPN`
+  phone: string;
+  status: PersonStatus;
+  status_note: string;
+  rating: number; // 1–10, periodic commander rating
+  qual: string[]; // topic ids this person is certified to instruct
+  is_team_commander: boolean;
+  is_instructor: boolean;
+  is_admin: boolean;
+  is_hapak_commander: boolean;
+  certs: Partial<Record<CertType, string>>; // expiry dates
+  notif: NotifPrefs;
+  has_pin: boolean; // the hash itself never leaves the server
+}
+
+export interface Attendance {
+  status: AttStatus;
+  reason: string;
+  marked_at: string;
+  approved: boolean;
+  approved_by: string | null;
+  rating: number | null;
+  auto: boolean; // set by the final approval for anyone who never responded
+}
+
+export interface DayBlock {
+  id: string;
+  time: string;
+  title: string;
+}
+
+export interface GearItem {
+  id: string;
+  name: string;
+  qty: number;
+  returned: boolean;
+  missing: string;
+  owner_id: string | null;
+}
+
+export interface Vehicle {
+  id: string;
+  type: string;
+  tz: string;
+  driver_id: string | null;
+  seats: number;
+  departure: string;
+  fitness: Fitness;
+  fault: string;
+}
+
+export interface AmmoRow {
+  id: string;
+  weapon: string;
+  per_fighter: number;
+  allocated: number;
+  used: number;
+}
+
+export interface FoodRow {
+  id: string;
+  name: string;
+  qty: number;
+  unit: string;
+  note: string;
+}
+
+export interface Attachment {
+  name: string;
+  is_image: boolean;
+  url: string | null;
+  size: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  author_id: string;
+  text: string;
+  time: string;
+  pinned: boolean;
+  read_by: string[];
+  attachment: Attachment | null;
+}
+
+export interface Feedback {
+  overall: number;
+  instructor: number;
+  logistics: number;
+  comment: string;
+  time: string;
+}
+
+export interface Photo {
+  id: string;
+  name: string;
+  url: string | null;
+  by: string;
+}
+
+export interface TrainingSummary {
+  commander: string;
+  instructor: string;
+  keep: string;
+  improve: string;
+}
+
+export interface ApprovalEntry {
+  by: string;
+  at: string;
+  scope: string; // person id, or 'all'
+}
+
+export interface Training {
+  id: string;
+  seq: number;
+  team_id: TrainingTeam;
+  topic_id: string;
+  date: string;
+  end_date: string | null;
+  start: string;
+  end: string;
+  location: string;
+  coords: string;
+  instructor_id: string | null;
+  commander_id: string | null;
+  inst_status: InviteStatus;
+  cmd_status: InviteStatus;
+  inst_invited_at: string | null;
+  cmd_invited_at: string | null;
+  status: TrainingStatus;
+  freq: string;
+  safety: string;
+  pickup: string;
+  departure: string;
+  medic_id: string | null;
+  evac_vehicle_id: string | null;
+  order_file: { name: string; size: number } | null;
+  notes: string;
+  trainer_summarized: boolean;
+  approved_all: boolean;
+  ammo_signed: boolean;
+  ammo_signed_by: string | null;
+  ammo_signed_at: string | null;
+  cancel_reason: string;
+  summary: TrainingSummary;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A training with everything hanging off it — what the screens and rules operate on. */
+export interface TrainingFull extends Training {
+  day_blocks: DayBlock[];
+  attendance: Record<string, Attendance>;
+  gear: GearItem[];
+  vehicles: Vehicle[];
+  ammo: AmmoRow[];
+  food: FoodRow[];
+  chat: ChatMessage[];
+  feedback: Record<string, Feedback>;
+  photos: Photo[];
+  approval_log: ApprovalEntry[];
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  all_day: boolean;
+  location: string;
+  training_id: string | null;
+  note: string;
+  source: 'manual' | 'google';
+}
+
+export interface Notification {
+  id: string;
+  text: string;
+  time: string;
+  read: boolean; // resolved per-viewer from notification_reads
+  to: string[] | null; // null = everyone
+  training_id: string | null;
+}
+
+export interface JoinRequest {
+  id: string;
+  name: string;
+  rank: string;
+  role: string;
+  pn: string;
+  phone: string;
+  team_id: TeamKey;
+  status: 'pending' | 'approved' | 'rejected';
+  at: string;
+}
+
+/** The whole unit's state, as the screens see it. */
+export interface Db {
+  settings: Settings;
+  teams: Record<TeamKey, Team>;
+  topics: Topic[];
+  people: Person[];
+  trainings: TrainingFull[];
+  gear_catalog: string[];
+  vehicle_types: string[];
+  weapons: string[];
+  locations: string[];
+  calendar: CalendarEvent[];
+  notifications: Notification[];
+  join_requests: JoinRequest[];
+}
+
+export interface RotationConfig {
+  start: string;
+  weekday: string | number;
+  start_time: string;
+  end_time: string;
+  team_weeks: number;
+  joint_weeks: number;
+  stagger: boolean;
+  location: string;
+  topics: string[];
+  joint_topics: string[];
+  replace: boolean;
+}

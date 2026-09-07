@@ -1,0 +1,17 @@
+{
+  "name": "כשירות חפ״ק מח״ט 300",
+  "short_name": "כשירות חפ״ק",
+  "description": "תוכנית האימונים של שני צוותי החפ״ק — לו״ז, נוכחות, מדריכים ומפקדי אימון, לוגיסטיקה ותחמושת.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/schedule",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#141a0e",
+  "theme_color": "#141a0e",
+  "icons": [
+    { "src": "/emblem.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/emblem.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
