@@ -26,6 +26,8 @@
 
 
 
+
+
 -- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  טבלאות
 -- ╚══════════════════════════════════════════════════════════════════════╝
@@ -1353,27 +1355,10 @@ end $$;
 
 -- ── הפעלת התזכורות ────────────────────────────────────────────────────────
 --
--- Deliberately line comments, not a /* … */ block: the cron expression below
--- contains the two characters that close a block comment, which would end it
--- early and leave the rest of the schedule to be parsed as SQL.
---
--- הרץ את זה פעם אחת ב-SQL Editor, אחרי שהאתר פורסם ב-Vercel, כשאתה מחליף:
---   <SITE>         כתובת האתר, למשל  https://hapak300.vercel.app
---   <CRON_SECRET>  אותה מחרוזת בדיוק שהגדרת ב-Vercel תחת CRON_SECRET
---
---   select cron.schedule(
---     'hapak-automations',
---     '*/10 * * * *',
---     $$
---     select net.http_post(
---       url     := '<SITE>/api/cron',
---       headers := jsonb_build_object(
---                    'Content-Type', 'application/json',
---                    'Authorization', 'Bearer <CRON_SECRET>'),
---       body    := '{}'::jsonb
---     );
---     $$
---   );
+-- פקודת התזמון עצמה אינה נמצאת בקובץ הזה בכוונה: היא מכילה ביטוי cron שבתוכו
+-- רצף תווים שסוגר הערת SQL, ודי היה בכך כדי להפיל את כל הקובץ. את הפקודה
+-- מריצים בנפרד ב-SQL Editor אחרי שהאתר פורסם — הנוסח המלא נמצא ב-README.md,
+-- בסעיף "התזכורות".
 --
 -- לבדיקה:      select jobname, schedule, active from cron.job;
 -- לעצירה:      select cron.unschedule('hapak-automations');

@@ -37,8 +37,8 @@
    קובץ אחד שמכיל את כל המיגרציות והנתונים ההתחלתיים, ורץ כטרנזקציה אחת.
 3. **Database → Extensions** → הפעל `pg_cron` ו-`pg_net`.
 4. **Vercel → Import** את הריפו, **Root Directory = `app`**, והוסף את משתני הסביבה מסעיף 3.
-5. אחרי הפרסום — הרץ ב-SQL Editor את פקודת ה-`cron.schedule` שבתחתית
-   `supabase/migrations/*_automations.sql`, עם כתובת האתר וה-`CRON_SECRET` שלך.
+5. אחרי הפרסום — הרץ ב-SQL Editor את פקודת ה-`cron.schedule` מסעיף 5 כאן,
+   עם כתובת האתר וה-`CRON_SECRET` שלך.
 
 ---
 
@@ -87,7 +87,35 @@ npm run dev                          # http://localhost:3000
 כל אירוע נשלח **פעם אחת** — המפתח הראשי של `reminders_sent` הוא מה שמבטיח זאת.
 באותו מעבר נשלח גם Web Push לכל התראה שטרם נשלחה, לפי העדפות ההתראות של כל אדם.
 
-לפוש: `npx web-push generate-vapid-keys` → ה-public ל-`NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
+### הפעלת התזמון
+
+הפקודה הזו אינה חלק מ-`setup.sql` בכוונה — ביטוי ה-cron שבתוכה מכיל רצף תווים
+שסוגר הערת SQL, ודי בכך כדי להפיל קובץ שלם. מריצים אותה פעם אחת ב-SQL Editor
+אחרי שהאתר פורסם, עם `<SITE>` = כתובת האתר ו-`<CRON_SECRET>` = אותה מחרוזת
+שהוגדרה ב-Vercel:
+
+```sql
+select cron.schedule(
+  'hapak-automations',
+  '*/10 * * * *',
+  $$
+  select net.http_post(
+    url     := '<SITE>/api/cron',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'Authorization', 'Bearer <CRON_SECRET>'),
+    body    := '{}'::jsonb
+  );
+  $$
+);
+```
+
+בדיקה: `select jobname, schedule, active from cron.job;`
+עצירה: `select cron.unschedule('hapak-automations');`
+
+### פוש
+
+`npx web-push generate-vapid-keys` → ה-public ל-`NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
 ה-private ל-`VAPID_PRIVATE_KEY`. בלעדיהם ההתראות בתוך האפליקציה עובדות כרגיל.
 
 ---
