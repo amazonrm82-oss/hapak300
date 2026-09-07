@@ -40,6 +40,10 @@
    > נכשל על טבלאות קיימות). לכל עדכון כזה יש קובץ `supabase/patch-NN-*.sql`
    > קטן, שבטוח להדביק ולהריץ שוב ושוב על בסיס קיים.
 4. **Vercel → Import** את הריפו, **Root Directory = `app`**, והוסף את משתני הסביבה מסעיף 3.
+   > **Settings → Deployment Protection → Vercel Authentication = Disabled.**
+   > כשההגנה דלוקה, Vercel מציג מסך התחברות **משלו** לפני האתר — ולוחם בלי
+   > חשבון Vercel פשוט לא נכנס. מי שנכנס לאפליקציה אמור לראות את מסך המספר
+   > האישי והקוד, ותו לא. השמירה על הנתונים היא ה-RLS והקוד, לא שער של Vercel.
 5. אחרי הפרסום — הרץ ב-SQL Editor את פקודת ה-`cron.schedule` מסעיף 5 כאן,
    עם כתובת האתר וה-`CRON_SECRET` שלך.
 
@@ -235,6 +239,18 @@ node supabase/build-setup.mjs   # בונה מחדש את setup.sql מהמיגר�
 **״חסרה הגדרת Supabase״** — `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` חסרים. שים לב שה-URL הוא הבסיס בלבד, **בלי** `/rest/v1/`.
 
 **המערכת מבקשת לבחור קוד בכל כניסה מחדש** — `pin_hash` לא נשמר. מסלולי הכניסה כותבים אותו עם מפתח השרת, שאין לו JWT של משתמש, והטריגר `guard_people_self_edit` דחה בדיוק את זה. מתוקן ב-`supabase/patch-01-admin-rank.sql`; בדיקה: `select name, pin_hash is not null as has_pin from people;`
+
+**מבקשים ממני להתחבר ל-Vercel / ״Log in to Vercel״ במקום מסך הכניסה** — שני מקורות אפשריים:
+
+1. **הקישור שחילקת אינו כתובת הייצור.** כל דיפלוימנט מקבל כתובת ייחודית משלו
+   (`hapak300-<hash>-<user>.vercel.app`) והיא מוגנת תמיד. חלק רק את הכתובת
+   הקבועה של הפרויקט — Vercel → Project → **Domains**, זו שאין בה hash.
+2. **Deployment Protection דלוקה.** Vercel → Settings → **Deployment Protection**
+   → **Vercel Authentication** → **Disabled** (לפחות ל-Production), ואז Redeploy.
+
+**איך בודקים בלי לנחש:** פתח בטלפון, בחלון פרטי, את `<SITE>/api/health`. אם חוזר
+JSON בעברית — האתר פתוח וכל לוחם יכול להיכנס. אם מופיע מסך של Vercel — אחת משתי
+הסיבות למעלה.
 
 **נכנסים ומיד חוזרים למסך הכניסה** — `PIN_PEPPER`, `AUTH_DERIVE_SECRET` או `SUPABASE_SERVICE_ROLE_KEY` חסרים בין משתני הסביבה. הוסף ב-Vercel והרץ Redeploy.
 
