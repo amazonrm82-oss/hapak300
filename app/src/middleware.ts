@@ -27,7 +27,9 @@ export function middleware(request: NextRequest) {
   } catch {
     /* misconfigured URL — the app will say so on its own */
   }
-  const sbSocket = sbHost.replace(/^https:/, 'wss:');
+  // realtime connects over a websocket to the same host; deriving the scheme
+  // only from https left a local http Supabase blocked by this very policy
+  const sbSocket = sbHost.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
 
   const csp = [
     `default-src 'self'`,
