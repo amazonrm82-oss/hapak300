@@ -776,6 +776,44 @@ export async function setTrainingField(
   check(error);
 }
 
+/**
+ * Names the evacuation vehicle from the fleet, adding it to the training first.
+ *
+ * The field points at a vehicle *on this training*, and that is the honest
+ * shape: the evacuation vehicle drives with the convoy, takes a driver and
+ * seats, and belongs on the manifest like any other. So a vehicle picked from
+ * the fleet that is not yet on the training is put there, and only then named
+ * — rather than being a registration number written on the overview and
+ * nowhere else.
+ */
+export async function setEvacFromFleet(
+  tid: string,
+  f: { type: string; tz: string; seats: number },
+  departure: string,
+): Promise<void> {
+  const { data, error } = await sb()
+    .from('vehicles')
+    .insert({
+      training_id: tid,
+      type: f.type,
+      tz: f.tz,
+      driver_id: null,
+      seats: f.seats || 4,
+      departure,
+      sort: 999,
+    })
+    .select('id')
+    .single();
+  check(error);
+  if (!data?.id) throw new Error('הרכב נוסף אך לא חזר מזהה — רענן ונסה שוב');
+
+  const { error: e2 } = await sb()
+    .from('trainings')
+    .update({ evac_vehicle_id: data.id })
+    .eq('id', tid);
+  check(e2);
+}
+
 export async function setSummaryField(
   t: TrainingFull,
   key: keyof TrainingFull['summary'],

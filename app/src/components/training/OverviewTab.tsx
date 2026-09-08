@@ -20,6 +20,7 @@ import {
   attachOrder,
   invitePerson,
   removeRow,
+  setEvacFromFleet,
   setTrainingField,
 } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
@@ -64,6 +65,9 @@ export function OverviewTab({ training: t, onInvite }: Props) {
   const sun = sunTimes(t.date);
   const ps = participants(db, t);
   const evac = byId(t.vehicles, t.evac_vehicle_id);
+  // the fleet minus what is already on this training, matched by registration
+  const onTraining = new Set(t.vehicles.map((v) => v.tz).filter(Boolean));
+  const fleetSpare = db.fleet.filter((x) => x.active && !onTraining.has(x.tz));
   const isPart = ps.some((p) => p.id === user.id);
 
   const veh: Record<string, number> = {};
@@ -192,19 +196,52 @@ export function OverviewTab({ training: t, onInvite }: Props) {
             <Label>רכב פינוי</Label>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span>{evac ? `${evac.type} צ׳ ${evac.tz}` : 'טרם נקבע'}</span>
-              {perms.canEdit && (
+              {/* an empty picker tells nobody why it is empty */}
+              {perms.canEdit && t.vehicles.length === 0 && fleetSpare.length === 0 && (
+                <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
+                  אין רכבים במאגר — הוסף אותם במסך ״לוגיסטיקה״
+                </span>
+              )}
+              {perms.canEdit && (t.vehicles.length > 0 || fleetSpare.length > 0) && (
                 <select
                   className="input"
                   style={{ width: 'auto', minHeight: 28, padding: '1px 8px', fontSize: 12.5 }}
                   value={t.evac_vehicle_id ?? ''}
-                  onChange={(e) => void run(() => setTrainingField(t.id, 'evac_vehicle_id', e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const pick = val.startsWith('fleet:')
+                      ? db.fleet.find((x) => x.id === val.slice(6))
+                      : null;
+                    void run(() =>
+                      pick
+                        ? setEvacFromFleet(t.id, pick, t.departure)
+                        : setTrainingField(t.id, 'evac_vehicle_id', val),
+                    );
+                  }}
                 >
                   <option value="">בחר רכב פינוי</option>
-                  {t.vehicles.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.type} צ׳ {v.tz}
-                    </option>
-                  ))}
+                  {t.vehicles.length > 0 && (
+                    <optgroup label="רכבי האימון">
+                      {t.vehicles.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.type} צ׳ {v.tz}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {/* the rest of the fleet: choosing one puts it on the training
+                      as well, so the evacuation vehicle is on the manifest and
+                      not just a number written on this screen */}
+                  {fleetSpare.length > 0 && (
+                    <optgroup label="מצי הרכבים — יתווסף לאימון">
+                      {fleetSpare.map((x) => (
+                        <option key={x.id} value={`fleet:${x.id}`}>
+                          {x.type} צ׳ {x.tz}
+                          {x.fitness === 'כשיר' ? '' : ` · ${x.fitness}`}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               )}
             </span>

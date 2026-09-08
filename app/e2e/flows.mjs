@@ -321,9 +321,6 @@ try {
     check('המפקד סימן את הלוחם כנוכח', (await davidRow.innerText()).includes('מגיע'));
     check('והחלון נסגר על אותה לחיצה', (await page.locator('[role="dialog"]').count()) === 0);
 
-    // Now that someone has answered, the alert list is live. This training was
-    // created with no vehicle, so neither a driver nor a guard is owed — an
-    // alert that fires on every training is one nobody reads.
     // Now that someone has answered, the alert list is live. The proposal
     // above put three vehicles on this training, so a driver is owed — and a
     // guard is not, at any point.
@@ -351,6 +348,36 @@ try {
       !body.includes('נהגים מוסמכים'),
       body.match(/.*נהגים.*/)?.[0],
     );
+
+    // ── the evacuation vehicle comes from the fleet ──
+    //
+    // With no vehicle on the training the picker used to be empty, with nothing
+    // saying why. It now offers the unit's fleet, and choosing one puts it on
+    // the training as well — so the evacuation vehicle is on the manifest.
+    await page.goto(`${BASE}/logistics`, { waitUntil: 'networkidle' });
+    await settle(900);
+    await click('הוספת רכב');
+    await settle(600);
+    await page.locator('input[placeholder="612345"]').fill('6120099');
+    await click('שמירה');
+    await settle(1800);
+    check('רכב נוסף לצי הרכבים של היחידה', await has('6120099'));
+
+    await page.goto(trainingUrl, { waitUntil: 'networkidle' });
+    await settle(1400);
+    const evacPick = page
+      .locator('select')
+      .filter({ has: page.locator('option:text-is("בחר רכב פינוי")') })
+      .first();
+    const fromFleet = await evacPick
+      .locator('option')
+      .evaluateAll((os) => os.find((o) => o.value.startsWith('fleet:'))?.value ?? '');
+    check('ורכב הפינוי נבחר מתוך הצי', !!fromFleet, 'הרשימה עדיין ריקה');
+    if (fromFleet) {
+      await evacPick.selectOption(fromFleet);
+      await settle(2200);
+      check('ומשנבחר — הוא רשום כרכב הפינוי של האימון', await has('6120099'));
+    }
 
     // ── drills ──
     await click('מקצים');
