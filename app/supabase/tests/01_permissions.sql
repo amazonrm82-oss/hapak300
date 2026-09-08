@@ -1035,3 +1035,49 @@ begin
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ אמר״ל אישי ════════
+--
+-- אמר״ל הוא פריט צל״ם כמו הנשק: הסמל חותם עליו, ולכן הוא גם רואה את הצ׳
+-- וגם מעדכן אותו. לוחם רגיל לא רואה צ׳ של אחר ולא נוגע בו.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = 'bbbbbbbb-0000-0000-0000-00000000000b';
+set role authenticated;
+
+do $t$ begin
+  update people set nvg = 'אמר״ל 4×', nvg_serial = '7788990'
+  where id = (select id from people_view where name = 'דניאל כץ');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '✅  122  סמל צוות מעדכן אמר״ל ומספר אמר״ל';
+exception when others then
+  raise notice '❌  122  סמל צוות נחסם מעדכון אמר״ל — %', sqlerrm;
+end $t$;
+
+select case when (select nvg_serial from people_view where name = 'דניאל כץ') = '7788990'
+            then '✅' else '❌' end || '  123  ורואה את הצ׳ שרשם';
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+select case when (select nvg_serial from people_view where name = 'איתי רוזן') = ''
+            then '✅' else '❌' end || '  124  לוחם רגיל אינו רואה צ׳ אמר״ל של אחר';
+
+do $t$
+declare before_n text; after_n text;
+begin
+  select nvg into before_n from people_view where name = 'איתי רוזן';
+  begin
+    update people set nvg = 'משהו אחר'
+    where id = (select id from people_view where name = 'איתי רוזן');
+  exception when others then null;
+  end;
+  select nvg into after_n from people_view where name = 'איתי רוזן';
+  if after_n is distinct from before_n then
+    raise notice '❌  125  לוחם רגיל שינה אמר״ל של אחר — כשל אבטחה';
+  else
+    raise notice '✅  125  ואינו יכול לשנות אותו';
+  end if;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

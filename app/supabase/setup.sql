@@ -2528,6 +2528,105 @@ begin
   raise exception 'אין הרשאה לערוך לוחם אחר';
 end $$;
 
+-- ── אמר״ל אישי ודו״ח צל״ם ──────────────────────────────────────────────────
+--
+-- A fighter signs for two controlled items, not one: his weapon and his night
+-- vision. The weapon was already on the card; the night vision lived in a
+-- notebook, and a צל״ם list was assembled by asking people. Both now sit in the
+-- same place, and the serial is masked from the unit at large exactly as the
+-- weapon serial is — the people who sign for kit see it, nobody else does.
+
+alter table people add column if not exists nvg        text not null default '';
+alter table people add column if not exists nvg_serial text not null default '';
+
+comment on column people.nvg is 'סוג אמר״ל אישי';
+comment on column people.nvg_serial is 'צ׳ של האמר״ל';
+
+grant select (nvg, nvg_serial) on people to authenticated;
+
+create or replace view people_view as
+select
+  p.id,
+  p.team_id,
+  p.rank,
+  p.name,
+  p.role,
+  case when can_see_pn() or p.id = me_id() then p.pn else '' end as pn,
+  p.phone,
+  p.status,
+  p.status_note,
+  p.rating,
+  p.qual,
+  p.is_team_commander,
+  p.is_instructor,
+  p.is_admin,
+  p.is_hapak_commander,
+  p.certs,
+  p.notif,
+  (p.pin_hash is not null) as has_pin,
+  p.pin_set_at,
+  p.created_at,
+  p.updated_at,
+  p.weapon,
+  case
+    when can_see_pn() or p.id = me_id() or is_sergeant() then p.weapon_serial
+    else ''
+  end as weapon_serial,
+  p.medical_profile,
+  p.limitations,
+  p.nvg,
+  case
+    when can_see_pn() or p.id = me_id() or is_sergeant() then p.nvg_serial
+    else ''
+  end as nvg_serial
+from people p
+where me_id() is not null or auth.uid() is null;
+
+grant select on people_view to authenticated;
+
+-- the סמל צוות signs for the night vision as he does for the weapon
+create or replace function guard_people_self_edit() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  own     text[] := array['notif', 'updated_at'];
+  kit     text[] := array['weapon', 'weapon_serial', 'nvg', 'nvg_serial', 'certs', 'updated_at'];
+  no_touch text[] := array[
+    'is_team_commander', 'is_instructor', 'is_hapak_commander', 'is_admin',
+    'qual', 'auth_id', 'pin_hash', 'pin_set_at', 'sessions_valid_from'
+  ];
+  col text;
+begin
+  if auth.uid() is null then return new; end if;
+  if is_admin() then return new; end if;
+
+  if new.id = me_id() and not is_team_cmd() then
+    if is_sergeant() then own := own || kit; end if;
+    if (to_jsonb(new) - own) is distinct from (to_jsonb(old) - own) then
+      raise exception 'רק מנהל מערכת או מפקד החפ״ק יכולים לשנות פרטים, הרשאות והסמכות';
+    end if;
+    return new;
+  end if;
+
+  if is_team_cmd()
+     and (new.id = me_id() or old.team_id is not distinct from my_team()) then
+    foreach col in array no_touch loop
+      if to_jsonb(new)->col is distinct from to_jsonb(old)->col then
+        raise exception 'מפקד צוות אינו ממנה מפקד צוות, מדריך, מפקד חפ״ק או מנהל מערכת';
+      end if;
+    end loop;
+    return new;
+  end if;
+
+  if is_sergeant() then
+    if (to_jsonb(new) - kit) is distinct from (to_jsonb(old) - kit) then
+      raise exception 'סמל צוות רשאי לעדכן נשק, אמר״ל והכשרות בלבד';
+    end if;
+    return new;
+  end if;
+
+  raise exception 'אין הרשאה לערוך לוחם אחר';
+end $$;
+
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  נתוני פתיחה

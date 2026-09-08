@@ -41,6 +41,10 @@ export interface Perms {
   canEditKit: boolean;
   /** Attach a fighter to another team's training, or arrange a makeup. */
   canGuest: boolean;
+  /** The צל״ם list of one team — a sergeant and above. */
+  canKitReport: boolean;
+  /** The צל״ם list of the whole unit — a team commander and above. */
+  canKitReportAll: boolean;
 }
 
 // `_db` is kept in the signature so every call site reads the same as the
@@ -91,6 +95,9 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
     canCatalogs: isAdmin || isAnyTeamCmd || isRasap,
     canEditKit: isAdmin || isSergeant,
     canGuest: isAdmin || isAnyTeamCmd,
+    // serial numbers of controlled items: whoever signs for them, and above
+    canKitReport: isAdmin || isAnyTeamCmd || isSergeant,
+    canKitReportAll: isAdmin || isAnyTeamCmd,
   };
 }
 

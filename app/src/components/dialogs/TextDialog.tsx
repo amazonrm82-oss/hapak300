@@ -39,16 +39,26 @@ export function TextDialog({
 }
 
 /**
- * Copies the training order to the clipboard, falling back to a dialog the
- * commander can copy from when the browser refuses.
+ * Puts a report where the unit actually sends it: WhatsApp.
+ *
+ * `share` copies to the clipboard — the reliable path on every browser. `toWhatsApp`
+ * copies as well and then opens WhatsApp with the message already written, which
+ * is one tap instead of three; the copy is what saves it when a phone blocks the
+ * new window. A browser that refuses the clipboard altogether gets the text in a
+ * dialog to copy by hand, so there is always a way out.
  */
 export function useShareOrder(toast: (m: string) => void) {
   const [fallback, setFallback] = useState<string | null>(null);
+  const [title, setTitle] = useState('פקודת אימון — להעתקה');
 
-  const share = (text: string) => {
+  const copy = (text: string, label: string, then?: () => void) => {
+    setTitle(`${label} — להעתקה`);
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(
-        () => toast('פקודת האימון הועתקה — אפשר להדביק בוואטסאפ'),
+        () => {
+          toast(`${label} הועתק${then ? '' : ' — אפשר להדביק בוואטסאפ'}`);
+          then?.();
+        },
         () => setFallback(text),
       );
     } else {
@@ -56,14 +66,22 @@ export function useShareOrder(toast: (m: string) => void) {
     }
   };
 
+  const share = (text: string, label = 'פקודת האימון') => copy(text, label);
+
+  const toWhatsApp = (text: string, label = 'הדו״ח') =>
+    copy(text, label, () => {
+      const w = window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      if (!w) toast(`${label} הועתק — הדבק בוואטסאפ ידנית`);
+    });
+
   const dialog = (
     <TextDialog
       open={fallback !== null}
-      title="פקודת אימון — להעתקה"
+      title={title}
       text={fallback ?? ''}
       onClose={() => setFallback(null)}
     />
   );
 
-  return { share, dialog };
+  return { share, toWhatsApp, dialog };
 }

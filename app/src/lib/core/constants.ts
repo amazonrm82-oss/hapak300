@@ -97,6 +97,15 @@ export const WEAPONS = [
   'סימונים / נורים',
 ] as const;
 
+/** Night-vision devices the unit holds. Free text is allowed — this is the shortcut. */
+export const NVG_TYPES = [
+  'אמר״ל 1×',
+  'אמר״ל 4×',
+  'משקפת לילה',
+  'מצלמה תרמית',
+  'כוונת לילה',
+] as const;
+
 export const VEHICLE_TYPES = [
   'האמר',
   'רוביקון',

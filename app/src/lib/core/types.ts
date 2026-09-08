@@ -75,6 +75,9 @@ export interface Person {
   /** The weapon this fighter holds; the serial is masked from other fighters. */
   weapon: string;
   weapon_serial: string;
+  /** Night vision signed for by this fighter, and its serial. */
+  nvg: string;
+  nvg_serial: string;
   /** Israeli medical profile, 21–97, or null when it has not been entered. */
   medical_profile: number | null;
   limitations: string;

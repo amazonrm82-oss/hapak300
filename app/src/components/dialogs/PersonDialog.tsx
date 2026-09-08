@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { CERT_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
+import { CERT_TYPES, NVG_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
 import { canEditPerson, canGrantRights, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
@@ -34,6 +34,8 @@ const emptyForm = (): PersonForm => ({
   certs: {},
   weapon: '',
   weapon_serial: '',
+  nvg: '',
+  nvg_serial: '',
   medical_profile: '',
   limitations: '',
 });
@@ -69,6 +71,8 @@ export function PersonDialog({ open, person, onClose }: Props) {
         certs: Object.fromEntries(CERT_TYPES.map(([k]) => [k, person.certs[k] ?? ''])),
         weapon: person.weapon ?? '',
         weapon_serial: person.weapon_serial ?? '',
+        nvg: person.nvg ?? '',
+        nvg_serial: person.nvg_serial ?? '',
         medical_profile: person.medical_profile ? String(person.medical_profile) : '',
         limitations: person.limitations ?? '',
       });
@@ -263,6 +267,18 @@ export function PersonDialog({ open, person, onClose }: Props) {
               placeholder="נראה למפקדים וללוחם עצמו בלבד"
             />
           </Field>
+          <Field label="אמר״ל">
+            <input className="input" list="hapak-nvg-full" value={f.nvg} onChange={set('nvg')} />
+            <datalist id="hapak-nvg-full">
+              {NVG_TYPES.map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="מספר אמר״ל (צ׳)">
+            <input className="input tabnum" value={f.nvg_serial} onChange={set('nvg_serial')} />
+          </Field>
+
           <Field label="פרופיל רפואי (21–97)">
             <input
               className="input tabnum"

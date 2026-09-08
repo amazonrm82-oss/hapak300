@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { CERT_TYPES } from '@/lib/core/constants';
+import { CERT_TYPES, NVG_TYPES } from '@/lib/core/constants';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
 import { saveKit, type KitForm } from '@/lib/data/mutations';
@@ -25,7 +25,7 @@ interface Props {
  */
 export function KitDialog({ open, person, onClose }: Props) {
   const { db, toast, refresh } = useApp();
-  const [f, setF] = useState<KitForm>({ weapon: '', weapon_serial: '', certs: {} });
+  const [f, setF] = useState<KitForm>({ weapon: '', weapon_serial: '', nvg: '', nvg_serial: '', certs: {} });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -33,6 +33,8 @@ export function KitDialog({ open, person, onClose }: Props) {
     setF({
       weapon: person.weapon ?? '',
       weapon_serial: person.weapon_serial ?? '',
+      nvg: person.nvg ?? '',
+      nvg_serial: person.nvg_serial ?? '',
       certs: Object.fromEntries(CERT_TYPES.map(([k]) => [k, person.certs[k] ?? ''])),
     });
   }, [open, person]);
@@ -57,8 +59,8 @@ export function KitDialog({ open, person, onClose }: Props) {
     <Dialog
       open
       onClose={onClose}
-      title={`נשק והכשרות · ${fullName(person)}`}
-      body="סמל צוות מעדכן נשק, מספר נשק והכשרות. שאר הפרטים שמורים למפקד החפ״ק ולמנהל המערכת."
+      title={`נשק, אמר״ל והכשרות · ${fullName(person)}`}
+      body="סמל צוות מעדכן נשק, אמר״ל והכשרות. שאר הפרטים שמורים למפקד החפ״ק ולמנהל המערכת."
       width={560}
       actions={
         <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
@@ -87,6 +89,28 @@ export function KitDialog({ open, person, onClose }: Props) {
             value={f.weapon_serial}
             onChange={(e) => setF((s) => ({ ...s, weapon_serial: e.target.value }))}
             placeholder="הצ׳ של הנשק"
+          />
+        </Field>
+        <Field label="אמר״ל">
+          <input
+            className="input"
+            list="hapak-nvg"
+            value={f.nvg}
+            onChange={(e) => setF((s) => ({ ...s, nvg: e.target.value }))}
+            placeholder="סוג האמר״ל"
+          />
+          <datalist id="hapak-nvg">
+            {NVG_TYPES.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="מספר אמר״ל">
+          <input
+            className="input tabnum"
+            value={f.nvg_serial}
+            onChange={(e) => setF((s) => ({ ...s, nvg_serial: e.target.value }))}
+            placeholder="הצ׳ של האמר״ל"
           />
         </Field>
       </div>

@@ -482,6 +482,8 @@ try {
   await kitButtons.first().click();
   await settle(900);
   await page.locator('input[placeholder="הצ׳ של הנשק"]').fill('5512345');
+  await page.locator('input[placeholder="סוג האמר״ל"]').fill('אמר״ל 4×');
+  await page.locator('input[placeholder="הצ׳ של האמר״ל"]').fill('7788990');
   await click('שמירה');
   await settle(2000);
   await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
@@ -489,8 +491,21 @@ try {
   await kitButtons.first().click();
   await settle(900);
   const savedSerial = await page.locator('input[placeholder="הצ׳ של הנשק"]').inputValue();
+  const savedNvg = await page.locator('input[placeholder="הצ׳ של האמר״ל"]').inputValue();
   check('ומספר הנשק שרשם נשמר וחזר', savedSerial === '5512345');
+  check('וגם האמר״ל', savedNvg === '7788990');
   await page.locator('button[aria-label="סגירה"], button:has-text("✕")').first().click();
+  await settle(600);
+
+  await click('דו״ח צל״ם');
+  await settle(1200);
+  const kitReport = await page.locator('[role="dialog"] textarea').inputValue();
+  check('ומוציא דו״ח צל״ם לצוות שלו', kitReport.includes('7788990') && kitReport.includes('אמר״ל'));
+  check(
+    'שאין בו דו״ח של כל היחידה',
+    (await page.locator('button:has-text("דו״ח צל״ם — כל היחידה")').count()) === 0,
+  );
+  await page.locator('button[aria-label="סגירה"]').first().click();
   await settle(600);
 
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });

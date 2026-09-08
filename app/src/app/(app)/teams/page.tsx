@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { Dialog } from '@/components/ui/Dialog';
 import { KitDialog } from '@/components/dialogs/KitDialog';
+import { useShareOrder } from '@/components/dialogs/TextDialog';
+import { kitHTML, kitText, printHTML } from '@/lib/core/exports';
 import { PersonDialog } from '@/components/dialogs/PersonDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
@@ -9,7 +12,7 @@ import { certAlerts } from '@/lib/core/alerts';
 import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
 import { canEditPerson, permsFor, roleLabel } from '@/lib/core/permissions';
 import { readinessOf } from '@/lib/core/readiness';
-import { fullName, personById, teamMembers, topicName } from '@/lib/core/selectors';
+import { fullName, personById, rankSort, teamMembers, topicName } from '@/lib/core/selectors';
 import type { Person, TeamKey } from '@/lib/core/types';
 import { decideJoinRequest, quickAddPerson } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
@@ -20,6 +23,7 @@ export default function TeamsPage() {
   const [editing, setEditing] = useState<Person | null | undefined>(undefined); // undefined = closed
   // the סמל צוות edits weapon, serial and certifications only, in a form of its own
   const [editingKit, setEditingKit] = useState<Person | null>(null);
+  const [kitList, setKitList] = useState<{ text: string; html: string; scope: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [qa, setQa] = useState({
     name: '',
@@ -30,6 +34,9 @@ export default function TeamsPage() {
     team_id: 'a' as TeamKey,
   });
 
+  // hooks before the early return, or the order changes between renders
+  const { toWhatsApp, dialog: shareDialog } = useShareOrder(toast);
+
   if (!db || !user) return null;
 
   const perms = permsFor(db, user, null);
@@ -37,6 +44,16 @@ export default function TeamsPage() {
   const joins = perms.canManagePeople ? db.join_requests.filter((j) => j.status === 'pending') : [];
   const staff = db.people.filter((p) => !p.team_id);
   const teamsEmpty = !db.people.some((p) => p.team_id);
+
+  /**
+   * The צל״ם list, offered both ways it gets sent: a message and a printable
+   * page. One call site builds both, so the two can never disagree about who is
+   * on the list.
+   */
+  const kitReport = (people: Person[], scope: string) => {
+    const sorted = [...people].sort(rankSort);
+    setKitList({ text: kitText(db, sorted, scope), html: kitHTML(db, sorted, scope), scope });
+  };
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -57,16 +74,26 @@ export default function TeamsPage() {
             {perms.seesPN ? 'ממוין לפי דרגה · מספרים אישיים גלויים למפקדים בלבד' : 'ממוין לפי דרגה'}
           </p>
         </div>
-        {perms.canManagePeople && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary" onClick={() => setSettingsOpen(true)}>
-              שמות צוותים והגדרות
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {perms.canKitReportAll && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => kitReport(db.people.filter((p) => p.status === 'active'), 'כל היחידה')}
+            >
+              דו״ח צל״ם — כל היחידה
             </button>
-            <button className="btn btn-primary" onClick={() => setEditing(null)}>
-              + הוספת לוחם
-            </button>
-          </div>
-        )}
+          )}
+          {perms.canManagePeople && (
+            <>
+              <button className="btn btn-secondary" onClick={() => setSettingsOpen(true)}>
+                שמות צוותים והגדרות
+              </button>
+              <button className="btn btn-primary" onClick={() => setEditing(null)}>
+                + הוספת לוחם
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {perms.canManagePeople && (
@@ -239,6 +266,15 @@ export default function TeamsPage() {
                     {members.filter((p) => p.status === 'active').length} פעילים · {members.length} סה״כ
                   </span>
                 </div>
+                {perms.canKitReport && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+                    onClick={() => kitReport(members.filter((p) => p.status === 'active'), db.teams[tm].name)}
+                  >
+                    דו״ח צל״ם
+                  </button>
+                )}
                 {perms.seesStats && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <span className="tabnum" style={{ fontSize: 20 }}>
@@ -363,6 +399,45 @@ export default function TeamsPage() {
           ))}
         </div>
       </SectionCard>
+
+      {kitList && (
+        <Dialog
+          open
+          onClose={() => setKitList(null)}
+          width={560}
+          title={`דו״ח צל״ם · ${kitList.scope}`}
+          body="סוג נשק ומספרו, סוג אמר״ל ומספרו — לכל לוחם. מי שחסר לו פרט מסומן בדו״ח."
+          actions={
+            <>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  const ok = printHTML(db.settings.app_name, kitList.html);
+                  toast(ok ? 'נפתח חלון הדפסה — שמור כ-PDF' : 'הדפדפן חסם את חלון ההדפסה');
+                }}
+              >
+                PDF להורדה
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => toWhatsApp(kitList.text, 'דו״ח הצל״ם')}
+              >
+                שליחה בוואטסאפ
+              </button>
+            </>
+          }
+        >
+          <textarea
+            className="input"
+            rows={12}
+            readOnly
+            value={kitList.text}
+            style={{ fontSize: 12.5, lineHeight: 1.5 }}
+          />
+        </Dialog>
+      )}
+
+      {shareDialog}
 
       <KitDialog
         open={!!editingKit}

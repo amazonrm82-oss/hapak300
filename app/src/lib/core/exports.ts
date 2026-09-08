@@ -9,7 +9,8 @@ import {
   trainingTitle,
 } from './selectors';
 import { resultScore, scoresFor, trainingScore } from './drills';
-import type { Db, TrainingFull } from './types';
+import { ammoUsage } from './ammo';
+import type { Db, Person, TrainingFull } from './types';
 
 // Quotes are escaped too: this output is also read inside attributes, and a
 // name or a location is text the unit types, not text we control.
@@ -340,5 +341,156 @@ export function drillsHTML(db: Db, t: TrainingFull): string {
     ) +
     `</tbody></table>` +
     perDrill
+  );
+}
+
+// ── ammunition actually fired ──────────────────────────────────────────────
+
+/**
+ * The consumption report, in the two shapes the unit sends it.
+ *
+ * The numbers come from the stations rather than from a count at the gate:
+ * every round a fighter fired was written down at the time, because the score
+ * depends on it. What is left is to total it, put it against what the training
+ * drew, and say the difference out loud.
+ */
+export function ammoText(db: Db, t: TrainingFull): string {
+  const u = ammoUsage(db, t);
+  const lines = [
+    `דו״ח צריכת תחמושת — ${db.settings.unit_name}`,
+    `${trainingTitle(db, t)} · ${topicName(db, t.topic_id)}`,
+    dateLine(t),
+    `מיקום: ${t.location}`,
+    '',
+  ];
+
+  if (u.empty) {
+    lines.push('לא נרשם ירי במקצים של האימון הזה.');
+    return lines.join('\n');
+  }
+
+  lines.push('לפי סוג נשק:');
+  for (const r of u.rows) {
+    if (!r.fired && !r.allocated) continue;
+    const parts = [`  ${r.weapon}: נורו ${r.fired} כד׳`];
+    if (r.fighters) parts.push(`${r.fighters} לוחמים`);
+    if (r.allocated) parts.push(`הוקצו ${r.allocated} · יתרה ${r.allocated - r.fired}`);
+    lines.push(parts.join(' · '));
+  }
+
+  lines.push('', 'לפי מקצה:');
+  for (const d of u.byDrill) {
+    lines.push(`  ${d.name}: ${d.fired} כד׳ · ${d.hits} פגיעות`);
+  }
+
+  lines.push(
+    '',
+    `סה״כ נורו: ${u.fired} כד׳ · ${u.hits} פגיעות` +
+      (u.fired ? ` (${Math.round((100 * u.hits) / u.fired)}%)` : ''),
+  );
+  if (u.allocated) lines.push(`סה״כ הוקצו: ${u.allocated} כד׳ · יתרה ${u.allocated - u.fired}`);
+  if (u.recorded) lines.push(`נרשם ידנית בלוגיסטיקה: ${u.recorded} כד׳`);
+  if (u.unassigned)
+    lines.push(`מתוכם ${u.unassigned} כד׳ של לוחמים שלא רשום להם נשק אישי בכרטיס`);
+
+  return lines.join('\n');
+}
+
+/** The same report as printable HTML — the body of the PDF export. */
+export function ammoHTML(db: Db, t: TrainingFull): string {
+  const u = ammoUsage(db, t);
+  const head =
+    `<h1>דו״ח צריכת תחמושת · ${esc(trainingTitle(db, t))} · ${esc(topicName(db, t.topic_id))}</h1>` +
+    `<h2>${esc(dateLine(t))} · ${esc(t.location)}</h2>`;
+
+  if (u.empty)
+    return `${head}<p>לא נרשם ירי במקצים של האימון הזה.</p>`;
+
+  const weapons = u.rows
+    .filter((r) => r.fired || r.allocated)
+    .map(
+      (r) =>
+        `<tr><td>${esc(r.weapon)}</td><td>${r.fighters || ''}</td><td>${r.fired}</td><td>${r.hits}</td>` +
+        `<td>${r.fired ? `${Math.round((100 * r.hits) / r.fired)}%` : ''}</td>` +
+        `<td>${r.allocated || ''}</td><td>${r.allocated ? r.allocated - r.fired : ''}</td>` +
+        `<td>${r.recorded || ''}</td></tr>`,
+    )
+    .join('');
+
+  const drills = u.byDrill
+    .map((d) => `<tr><td>${esc(d.name)}</td><td>${d.fighters}</td><td>${d.fired}</td><td>${d.hits}</td></tr>`)
+    .join('');
+
+  const total =
+    `<tr><th>סה״כ</th><th></th><th>${u.fired}</th><th>${u.hits}</th>` +
+    `<th>${u.fired ? `${Math.round((100 * u.hits) / u.fired)}%` : ''}</th>` +
+    `<th>${u.allocated || ''}</th><th>${u.allocated ? u.allocated - u.fired : ''}</th>` +
+    `<th>${u.recorded || ''}</th></tr>`;
+
+  return (
+    head +
+    `<table><thead><tr><th>נשק</th><th>לוחמים</th><th>נורו</th><th>פגיעות</th><th>אחוז</th>` +
+    `<th>הוקצו</th><th>יתרה</th><th>נרשם ידנית</th></tr></thead>` +
+    `<tbody>${weapons}${total}</tbody></table>` +
+    `<h2 style="margin-top:18px">פירוט לפי מקצה</h2>` +
+    `<table><thead><tr><th>מקצה</th><th>לוחמים</th><th>נורו</th><th>פגיעות</th></tr></thead><tbody>${drills}</tbody></table>` +
+    (u.unassigned
+      ? `<p class="muted">${u.unassigned} כדורים נורו על ידי לוחמים שלא רשום להם נשק אישי בכרטיס — הם מופיעים בשורה ״ללא נשק רשום״.</p>`
+      : '') +
+    `<p class="muted">הכמויות מחושבות מהמקצים של האימון: כל כדור שנרשם ללוחם במקצה נספר לנשק האישי שלו.</p>`
+  );
+}
+
+// ── צל״ם: the kit each fighter signs for ───────────────────────────────────
+
+/**
+ * Who holds what, by serial.
+ *
+ * A צל״ם list used to be assembled by walking the team and asking. Every number
+ * on it is already on the cards — the weapon, its serial, the night vision and
+ * its serial — so the list is a matter of printing what is known, and the gaps
+ * are the point: a blank serial is a fighter nobody has signed for yet.
+ */
+export function kitText(db: Db, people: Person[], scope: string): string {
+  const lines = [`דו״ח צל״ם — ${db.settings.unit_name}`, scope, '', ...people.map((p) => {
+    const parts = [
+      `${fullName(p)}${p.role ? ` · ${p.role}` : ''}`,
+      `  נשק: ${p.weapon || '—'} · צ׳ ${p.weapon_serial || '—'}`,
+      `  אמר״ל: ${p.nvg || '—'} · צ׳ ${p.nvg_serial || '—'}`,
+    ];
+    return parts.join('\n');
+  })];
+
+  const missing = people.filter(
+    (p) => !p.weapon || !p.weapon_serial || !p.nvg || !p.nvg_serial,
+  ).length;
+  lines.push('', `${people.length} לוחמים`);
+  if (missing) lines.push(`${missing} מהם חסרים פרט אחד או יותר`);
+  return lines.join('\n');
+}
+
+/** The same list as printable HTML — the body of the PDF export. */
+export function kitHTML(db: Db, people: Person[], scope: string): string {
+  const body = people
+    .map((p) => {
+      const gap = (v: string) =>
+        v ? esc(v) : '<span style="color:#b00">חסר</span>';
+      return (
+        `<tr><td>${esc(fullName(p))}</td><td>${esc(teamName(db, p.team_id))}</td><td>${esc(p.role)}</td>` +
+        `<td>${gap(p.weapon)}</td><td>${gap(p.weapon_serial)}</td>` +
+        `<td>${gap(p.nvg)}</td><td>${gap(p.nvg_serial)}</td></tr>`
+      );
+    })
+    .join('');
+  const missing = people.filter((p) => !p.weapon || !p.weapon_serial || !p.nvg || !p.nvg_serial).length;
+  return (
+    `<h1>דו״ח צל״ם · ${esc(db.settings.unit_name)}</h1>` +
+    `<h2>${esc(scope)} · ${people.length} לוחמים</h2>` +
+    `<table><thead><tr><th>שם ודרגה</th><th>צוות</th><th>תפקיד</th>` +
+    `<th>סוג נשק</th><th>מספר נשק</th><th>סוג אמר״ל</th><th>מספר אמר״ל</th></tr></thead>` +
+    `<tbody>${body}</tbody></table>` +
+    (missing
+      ? `<p class="muted">${missing} לוחמים חסרים פרט אחד או יותר — הם מסומנים ״חסר״ בטבלה.</p>`
+      : '<p class="muted">כל הפרטים מלאים.</p>')
   );
 }

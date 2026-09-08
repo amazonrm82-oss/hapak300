@@ -18,6 +18,8 @@ import { TRAINING_STATUS } from '@/lib/core/constants';
 import { dateLine, pad, weekOf } from '@/lib/core/dates';
 import {
   attendanceCSV,
+  ammoHTML,
+  ammoText,
   attendanceHTML,
   downloadText,
   orderHTML,
@@ -59,7 +61,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
   const [postponeOpen, setPostponeOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const { share, dialog: shareDialog } = useShareOrder(toast);
+  const { share, toWhatsApp, dialog: shareDialog } = useShareOrder(toast);
 
   const t = db ? (byId(db.trainings, params.id) as TrainingFull | null) : null;
 
@@ -197,6 +199,24 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
                 style={{ whiteSpace: 'nowrap' }}
               >
                 דוח נוכחות PDF
+              </button>
+              {/* what the day actually fired, totalled from the stations */}
+              <button
+                className="btn btn-ghost"
+                onClick={() => toWhatsApp(ammoText(db, t), 'דו״ח התחמושת')}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                תחמושת לוואטסאפ
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  const ok = printHTML(db.settings.app_name, ammoHTML(db, t));
+                  toast(ok ? 'נפתח חלון הדפסה — שמור כ-PDF' : 'הדפדפן חסם את חלון ההדפסה');
+                }}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                דו״ח תחמושת PDF
               </button>
               <button
                 className="btn btn-ghost"

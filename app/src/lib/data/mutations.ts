@@ -860,6 +860,8 @@ export interface PersonForm {
   certs: Record<string, string>;
   weapon: string;
   weapon_serial: string;
+  nvg: string;
+  nvg_serial: string;
   medical_profile: string; // kept as text in the form; '' means not entered
   limitations: string;
 }
@@ -904,6 +906,8 @@ export async function savePerson(
     certs,
     weapon: form.weapon.trim(),
     weapon_serial: form.weapon_serial.trim(),
+    nvg: form.nvg.trim(),
+    nvg_serial: form.nvg_serial.trim(),
     // 21–97 is the Israeli scale; anything else is treated as not entered
     medical_profile: /^\d{2}$/.test(form.medical_profile.trim())
       ? Number(form.medical_profile.trim())
@@ -977,6 +981,8 @@ export async function quickAddPerson(
 export interface KitForm {
   weapon: string;
   weapon_serial: string;
+  nvg: string;
+  nvg_serial: string;
   certs: Record<string, string>;
 }
 
@@ -997,6 +1003,8 @@ export async function saveKit(pid: string, form: KitForm): Promise<void> {
     .update({
       weapon: form.weapon.trim(),
       weapon_serial: form.weapon_serial.trim(),
+      nvg: form.nvg.trim(),
+      nvg_serial: form.nvg_serial.trim(),
       certs,
     })
     .eq('id', pid);
