@@ -148,6 +148,15 @@ try {
   await settle(1500);
   check(10, 'הוספת לוחם לצוות סדיר', await has('דוד בדיקה'));
 
+  // a second fighter, in צוות א׳, to be the training's instructor: the two
+  // seeded people belong to no team and so cannot be offered as one, and the
+  // plain fighter must stay plain for the checks at the end to mean anything
+  await byLabel('שם מלא').fill('אבי מדריך');
+  await byLabel('מספר אישי').fill('7654322');
+  await byLabel('צוות').selectOption('a');
+  await click('הוסף');
+  await settle(1500);
+
   // ── 11. creating a training with logistics ──
   // the create button lives on the schedule, next to the week it would fall in
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
@@ -165,9 +174,21 @@ try {
   await times.nth(1).fill('17:00');
   await page.locator('input[list="hapak-locs"]').fill('שטח אימונים בדיקה');
 
-  // commander and instructor are mandatory before it will publish
-  await byLabel('מפקד אימון').selectOption({ index: 1 });
-  await byLabel('מדריך').selectOption({ index: 1 });
+  // Commander and instructor are mandatory before it will publish. Neither is
+  // the plain fighter, on purpose: an instructor may record the results of the
+  // station he ran, so making him one would hand him exactly the permissions
+  // the checks at the end are meant to prove he does not have.
+  const pickPerson = async (fieldLabel, nameFragment) => {
+    const select = byLabel(fieldLabel);
+    const value = await select
+      .locator('option')
+      .filter({ hasText: nameFragment })
+      .first()
+      .getAttribute('value');
+    await select.selectOption(value);
+  };
+  await pickPerson('מפקד אימון', 'זזון');
+  await pickPerson('מדריך', 'אבי מדריך');
 
   check(12, 'הצעת הלוגיסטיקה מופיעה בטופס', await has('ציוד נדרש'));
   check(13, 'ובתוכה מזון ומים ותחמושת', (await has('מזון ומים')) && (await has('תחמושת')));
@@ -177,8 +198,9 @@ try {
   const created = page.url().includes('/trainings/');
   check(14, 'האימון נוצר ונפתח', created);
 
+  let trainingUrl = null;
   if (created) {
-    const trainingUrl = page.url();
+    trainingUrl = page.url();
     check(15, 'מסך האימון מציג לשונית מקצים', await has('מקצים'));
 
     // ── 16. drills ──
@@ -259,9 +281,68 @@ try {
   const real = consoleErrors.filter(
     (e) => !/favicon|manifest|sw\.js|Failed to load resource: net::ERR_CONNECTION/i.test(e),
   );
+  // ── 35. the same app, entered as a plain fighter ──
+  //
+  // Everything up to here was done as the administrator, who is allowed
+  // everything — which proves nothing about what anyone else can reach. This
+  // signs in as the fighter added in step 10 and checks the walls from inside:
+  // the database refuses him (the SQL suite proves that), and the screens must
+  // not offer him what the database would refuse.
+  await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+  await settle();
+  await click('יציאה');
+  await settle(1200);
+
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.fill('input', '7654321');
+  await click('המשך');
+  await settle(900);
+  const fighterPins = page.locator('input[type="password"]');
+  await fighterPins.nth(0).fill('5297');
+  if ((await fighterPins.count()) > 1) await fighterPins.nth(1).fill('5297');
+  await click('שמור קוד');
+  await page.waitForURL(/\/(schedule|my)/, { timeout: 15000 }).catch(() => {});
+  await settle(1500);
+  check(34, 'לוחם רגיל נכנס למערכת בקוד שבחר', !page.url().includes('/login'));
+
+  await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  const canCreate = await page.locator('button:has-text("אימון חדש")').count();
+  check(35, 'ואין לו כפתור ליצירת אימון', canCreate === 0);
+
+  await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  check(36, 'מסך הניהול חסום בפניו', await has('ניהול התקופה שמור'));
+  check(37, 'ויומן הפעולות אינו נגלה לו', !(await has('יומן פעולות')));
+
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  const teamsAsFighter = await text();
+  check(38, 'אינו רואה מספר אישי של אחר', !teamsAsFighter.includes('8409505'));
+
+  if (trainingUrl) {
+    await page.goto(trainingUrl, { waitUntil: 'networkidle' });
+    await settle(1200);
+    await click('מקצים');
+    await settle(1000);
+    check(39, 'אין לו תיבת ציון לאימון', (await page.locator('button:has-text("שמור ציון")').count()) === 0);
+
+    await page.locator('button:has-text("ירי בעמידה")').first().click();
+    await settle(900);
+    const drillTable = page.locator('table').first();
+    const tableText = await drillTable.innerText();
+    check(
+      40,
+      'רואה במקצה רק את עצמו',
+      tableText.includes('דוד בדיקה') && !tableText.includes('אבי מדריך'),
+    );
+    const editable = await drillTable.locator('input:not([disabled])').count();
+    check(41, 'ואינו יכול לשנות תוצאות', editable === 0);
+  }
+
   const badResponses = failedRequests.filter((r) => !/favicon|manifest|sw\.js/.test(r));
   check(
-    34,
+    42,
     'אין שגיאות בקונסולה בכל המסכים',
     real.length === 0,
     [...new Set(badResponses)].slice(0, 6).join(' | ') || real.slice(0, 3).join(' | '),
