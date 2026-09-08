@@ -1,20 +1,57 @@
 import type { AttStatus, CertType, Fitness, TrainingStatus } from './types';
 
-/** Ranks, highest first — the roster sorts by this order. */
+/**
+ * Every rank in the army, highest first — the order is also the seniority used
+ * to sort a roster (`RANK_ORDER`), so it must stay descending.
+ *
+ * Officers sit above the warrant officers (נגדים), who sit above the enlisted
+ * ranks. A rank that is not on this list still works — `rankSort` puts it last
+ * rather than failing — so nobody is blocked by an omission here.
+ */
 export const RANKS = [
+  // קצינים
+  'רא״ל',
+  'אלוף',
+  'תא״ל',
   'אל״ם',
   'סא״ל',
   'רס״ן',
   'סרן',
   'סגן',
   'סג״ם',
+  // נגדים
+  'רנ״ב',
+  'רנ״מ',
+  'רנ״ג',
+  'רס״ב',
+  'רס״ם',
   'רס״ר',
   'רס״ל',
+  // חוגרים
   'סמ״ר',
   'סמל',
   'רב״ט',
   'טוראי',
 ] as const;
+
+/** The full name behind each abbreviation, for the picker. */
+export const RANK_FULL: Record<string, string> = {
+  'רא״ל': 'רב אלוף',
+  'תא״ל': 'תת אלוף',
+  'אל״ם': 'אלוף משנה',
+  'סא״ל': 'סגן אלוף',
+  'רס״ן': 'רב סרן',
+  'סג״ם': 'סגן משנה',
+  'רנ״ב': 'רב נגד בכיר',
+  'רנ״מ': 'רב נגד משנה',
+  'רנ״ג': 'רב נגד',
+  'רס״ב': 'רב סמל בכיר',
+  'רס״ם': 'רב סמל מתקדם',
+  'רס״ר': 'רב סמל ראשון',
+  'רס״ל': 'רב סמל',
+  'סמ״ר': 'סמל ראשון',
+  'רב״ט': 'רב טוראי',
+};
 
 export const RANK_ORDER: Record<string, number> = Object.fromEntries(RANKS.map((r, i) => [r, i]));
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { CERT_TYPES, RANKS, ROLES } from '@/lib/core/constants';
+import { CERT_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
 import { canEditPerson, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
@@ -193,6 +193,7 @@ export function PersonDialog({ open, person, onClose }: Props) {
               {RANKS.map((r) => (
                 <option key={r} value={r}>
                   {r}
+                  {RANK_FULL[r] ? ` · ${RANK_FULL[r]}` : ''}
                 </option>
               ))}
             </select>

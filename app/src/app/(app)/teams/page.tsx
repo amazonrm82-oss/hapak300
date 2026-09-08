@@ -5,7 +5,7 @@ import { PersonDialog } from '@/components/dialogs/PersonDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
 import { certAlerts } from '@/lib/core/alerts';
-import { RANKS, ROLES } from '@/lib/core/constants';
+import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
 import { permsFor, roleLabel } from '@/lib/core/permissions';
 import { readinessOf } from '@/lib/core/readiness';
 import { fullName, personById, teamMembers, topicName } from '@/lib/core/selectors';
@@ -99,6 +99,7 @@ export default function TeamsPage() {
                 {RANKS.map((r) => (
                   <option key={r} value={r}>
                     {r}
+                  {RANK_FULL[r] ? ` · ${RANK_FULL[r]}` : ''}
                   </option>
                 ))}
               </select>
