@@ -4,6 +4,9 @@
 -- קוראת בלבד — לא משנה, לא מוחקת ולא מוסיפה כלום. אפשר להריץ מתי שרוצים.
 -- מדביקים ב-SQL Editor של Supabase ולוחצים Run.
 --
+-- כל שם טבלה כאן מלא (public.teams ולא teams): עורך ה-SQL מריץ שאילתות קריאה
+-- בלי public בנתיב החיפוש, ובלי הקידומת הוא לא מוצא את הטבלאות.
+--
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
 -- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -45,9 +48,9 @@ with checks(sort, patch, what, ok) as (values
    exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
             where t.typname = 'team_key' and e.enumlabel = 'c')),
   (13, '03b', 'צוות סדיר נוצר',
-   exists (select 1 from teams where id = 'c')),
+   exists (select 1 from public.teams where id = 'c')),
   (14, '03b', 'סדיר מקבל זימון לכל אימון של אלפה או ביתא',
-   exists (select 1 from teams where id = 'c' and attends_all)),
+   exists (select 1 from public.teams where id = 'c' and attends_all)),
 
   -- ── patch-04 ──
   (15, '04', 'מקצים באימון',
@@ -99,7 +102,7 @@ order by sort;
 select case
   when (select count(*) from information_schema.columns
          where table_name = 'trainings_view' and column_name = 'grade') = 1
-   and (select count(*) from teams where id = 'c' and attends_all) = 1
+   and (select count(*) from public.teams where id = 'c' and attends_all) = 1
    and to_regclass('public.drill_results') is not null
    and to_regclass('public.periods') is not null
    and to_regclass('public.fleet') is not null
