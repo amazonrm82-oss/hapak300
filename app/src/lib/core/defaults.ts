@@ -153,7 +153,7 @@ export function defaultVehicles(
   // would fail to save for a reason nobody could see on the form.
   const drivers = people.filter(
     (p) =>
-      p.role === 'נהג' &&
+      (p.is_driver || p.role === 'נהג') &&
       p.status === 'active' &&
       (!date || canDrive(p, date)) &&
       (teamId === 'joint'

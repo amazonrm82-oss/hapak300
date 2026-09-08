@@ -263,10 +263,11 @@ function VehiclesSection({
   fleet: FleetVehicle[];
 }) {
   const [v, setV] = useState({ type: '', tz: '', driver_id: '', seats: '', departure: '' });
-  // A driver needs a licence in date — נהיגה מבצעית or נהג רכב צבאי — and it is
-  // checked against the day of the training, not today: a licence that expires
-  // the week before is not a licence on the morning the convoy leaves.
-  const licensed = people.filter((p) => canDrive(p, t.date));
+  // Two conditions, both required: marked a driver — which is a job on top of
+  // whatever else he does — and a licence in date on the day of the training,
+  // not today. A licence that expires the week before is not a licence on the
+  // morning the convoy leaves.
+  const licensed = people.filter((p) => (p.is_driver || p.role === 'נהג') && canDrive(p, t.date));
   const drivers = licensed.filter((p) => p.role === 'נהג');
   const others = licensed.filter((p) => p.role !== 'נהג');
   const unlicensed = people.length - licensed.length;
@@ -277,7 +278,9 @@ function VehiclesSection({
       <span style={{ fontSize: 13, color: 'var(--color-neutral-400)' }}>
         {seats} מקומות ל-{people.length} לוחמים · שיבוץ נהגים ידני על ידי מפקד האימון ·{' '}
         {licensed.length} בעלי רישיון בתוקף
-        {unlicensed > 0 ? ` (${unlicensed} ללא נהיגה מבצעית או נהג רכב צבאי בתוקף — אינם ניתנים לשיבוץ)` : ''}
+        {unlicensed > 0
+          ? ` (${unlicensed} אינם ניתנים לשיבוץ — לא מוגדרים נהגים או ללא הסמכת נהיגה בתוקף)`
+          : ''}
       </span>
       <div style={{ overflowX: 'auto' }}>
         <table className="table" style={{ minWidth: 900 }}>

@@ -81,6 +81,8 @@ export interface Person {
   /** Night vision signed for by this fighter, and its serial. */
   nvg: string;
   nvg_serial: string;
+  /** May be assigned to drive, whatever else he does in the force. */
+  is_driver: boolean;
   /** Israeli medical profile, 21–97, or null when it has not been entered. */
   medical_profile: number | null;
   limitations: string;

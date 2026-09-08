@@ -863,13 +863,15 @@ end $t$;
 
 reset role; reset request.jwt.claim.sub;
 
--- ════════ נהג חייב רישיון בתוקף ════════
+-- ════════ נהג: מוגדר ככזה, ועם רישיון בתוקף ════════
 --
--- זו ההסמכה היחידה שחוסמת ולא רק מתריעה, ולכן היא נבדקת מול יום האימון
--- ולא מול היום שבו מישהו ערך את השורה.
+-- שני תנאים נפרדים. ההסמכה נבדקת מול יום האימון ולא מול היום שבו נערכה
+-- השורה, וההגדרה כנהג היא תפקיד נוסף — חובש שנוהג נשאר החובש.
 reset role; reset request.jwt.claim.sub;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 set role authenticated;
+
+update people set is_driver = true where id = (select id from people_view where name = 'תומר גל');
 
 do $t$ begin
   insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
@@ -888,9 +890,9 @@ do $t$ begin
   insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
   values ((select id from trainings limit 1), 'האמר', '1234567',
           (select id from people_view where name = 'תומר גל'), 6, '05:30', 91);
-  raise notice '✅  108  נהג עם רישיון בתוקף שובץ';
+  raise notice '✅  108  נהג מוגדר ועם רישיון בתוקף שובץ';
 exception when others then
-  raise notice '❌  108  נהג עם רישיון בתוקף נחסם — %', sqlerrm;
+  raise notice '❌  108  נהג תקין נחסם — %', sqlerrm;
 end $t$;
 
 -- ורישיון שפג — גם אם פג רק אתמול
@@ -904,6 +906,19 @@ do $t$ begin
   raise notice '❌  109  שובץ נהג עם רישיון שפג — כשל בטיחות';
 exception when others then
   raise notice '✅  109  רישיון שפג אינו רישיון';
+end $t$;
+
+-- ומי שאינו מוגדר נהג — גם עם רישיון מצוין
+update people set certs = jsonb_build_object('mildrive', to_char(current_date + 200, 'YYYY-MM-DD'))
+where id = (select id from people_view where name = 'איתי רוזן');
+
+do $t$ begin
+  insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
+  values ((select id from trainings limit 1), 'זאב', '5555555',
+          (select id from people_view where name = 'איתי רוזן'), 5, '05:30', 93);
+  raise notice '❌  110  שובץ כנהג מי שאינו מוגדר נהג — כשל';
+exception when others then
+  raise notice '✅  110  מי שאינו מוגדר נהג אינו משובץ לרכב';
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
@@ -1172,5 +1187,21 @@ end $t$;
 select case when exists (select 1 from information_schema.columns
                           where table_name = 'trainings_view' and column_name = 'fire_mode')
             then '✅' else '❌' end || '  131  וסוג האימון מגיע למסך';
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ נהג הוא תפקיד נוסף ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+select case when (select is_driver from people_view where name = 'תומר גל')
+            then '✅' else '❌' end || '  132  סימון נהג נשמר ומגיע למסך';
+
+-- חובש שנוהג נשאר החובש
+update people set is_driver = true where id = (select id from people_view where name = 'איתי רוזן');
+select case when (select role from people_view where name = 'איתי רוזן') = 'חובש'
+             and (select is_driver from people_view where name = 'איתי רוזן')
+            then '✅' else '❌' end || '  133  ותפקידו נשאר כפי שהיה';
 
 reset role; reset request.jwt.claim.sub;

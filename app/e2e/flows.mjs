@@ -69,6 +69,13 @@ page.on('response', (r) => {
     failedRequests.push(`${r.status()} ${r.request().method()} ${r.url()}`);
 });
 
+/** A labelled field inside whichever dialog is open. */
+const inDialogNow = (label) =>
+  page
+    .locator('[role="dialog"]')
+    .locator(`.field:has(label:text-is("${label}")) input, .field:has(label:text-is("${label}")) select`)
+    .first();
+
 const text = () => page.locator('body').innerText();
 const has = async (s) => (await text()).includes(s);
 const settle = (ms = 700) => page.waitForTimeout(ms);
@@ -84,9 +91,19 @@ const attendanceTab = async () => {
   await page.waitForTimeout(700);
 };
 
-/** Clicks the first button whose label contains `label`. */
+/**
+ * Clicks the first button whose label contains `label`.
+ *
+ * Waits out any button that reads ״רגע…״ first: while a request is in flight
+ * the login screen replaces its label with that, so the next click has nothing
+ * to match and times out — a race in the test, not a fault in the app.
+ */
 async function click(label, nth = 0) {
-  await page.locator(`button:has-text("${label}"), a:has-text("${label}")`).nth(nth).click();
+  await page
+    .locator('button:has-text("רגע…")')
+    .waitFor({ state: 'detached', timeout: 20000 })
+    .catch(() => {});
+  await page.locator(`button:has-text("${label}"), a:has-text("${label}")`).nth(nth).click({ timeout: 20000 });
   await settle();
 }
 
@@ -102,6 +119,19 @@ try {
     await settle(900);
   });
   check('מספר אישי לא רשום נדחה', await has('לא רשום'));
+
+  // ── the one door open to someone with no account: asking to join ──
+  await page.reload({ waitUntil: 'networkidle' });
+  await click('בקשת הצטרפות');
+  await settle(900);
+  const joinForm = page.locator('[role="dialog"]');
+  check('טופס בקשת ההצטרפות נפתח', (await joinForm.count()) > 0);
+  await inDialogNow('שם מלא').fill('חיצוני בדיקה');
+  await inDialogNow('מספר אישי').fill('7009911');
+  await inDialogNow('טלפון').fill('050-0000001');
+  await click('שלח בקשה');
+  await settle(1800);
+  check('והבקשה נשלחת בלי שום התחברות', !(await has('נכשל')) && !(await has('אין לך הרשאה')));
 
   // ── the administrator's first login asks for a code, without naming them ──
   await page.reload({ waitUntil: 'networkidle' });

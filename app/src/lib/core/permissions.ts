@@ -115,6 +115,22 @@ export function canEditPerson(user: Person | null, target: Person): boolean {
   return !!(user.is_team_commander && user.team_id && target.team_id === user.team_id);
 }
 
+/**
+ * May this person touch that card's kit at all?
+ *
+ * `canEditKit` says the viewer holds the right; this says the card is within
+ * reach. Rank still applies: only a system administrator edits a system
+ * administrator, and the database enforces exactly that. Without this the
+ * roster offered an HQ-party commander a ״נשק והכשרות״ button on the
+ * administrator's card — a button that could only ever end in a refusal.
+ */
+export function canEditKitOf(db: Db, user: Person | null, target: Person): boolean {
+  if (!user) return false;
+  if (user.is_admin) return true;
+  if (target.is_admin) return false;
+  return permsFor(db, user, null).canEditKit;
+}
+
 /** Appointing a commander, an instructor or an administrator — never a team commander's. */
 export function canGrantRights(user: Person | null): boolean {
   return !!(user && (user.is_admin || user.is_hapak_commander));

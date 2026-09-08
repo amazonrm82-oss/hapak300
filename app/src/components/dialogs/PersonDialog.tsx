@@ -30,6 +30,7 @@ const emptyForm = (): PersonForm => ({
   is_instructor: false,
   is_admin: false,
   is_hapak_commander: false,
+  is_driver: false,
   qual: [],
   certs: {},
   weapon: '',
@@ -67,6 +68,7 @@ export function PersonDialog({ open, person, onClose }: Props) {
         is_instructor: person.is_instructor,
         is_admin: person.is_admin,
         is_hapak_commander: person.is_hapak_commander,
+        is_driver: person.is_driver,
         qual: [...person.qual],
         certs: Object.fromEntries(CERT_TYPES.map(([k]) => [k, person.certs[k] ?? ''])),
         weapon: person.weapon ?? '',
@@ -267,6 +269,14 @@ export function PersonDialog({ open, person, onClose }: Props) {
               placeholder="נראה למפקדים וללוחם עצמו בלבד"
             />
           </Field>
+          <Field label="נהיגה" style={{ gridColumn: 'span 2' }}>
+            <Check
+              checked={f.is_driver}
+              onChange={set('is_driver')}
+              label="נהג — ניתן לשבץ כנהג רכב, בנוסף לתפקידו (נדרשת גם הסמכת נהיגה בתוקף)"
+            />
+          </Field>
+
           <Field label="אמר״ל">
             <input className="input" list="hapak-nvg-full" value={f.nvg} onChange={set('nvg')} />
             <datalist id="hapak-nvg-full">

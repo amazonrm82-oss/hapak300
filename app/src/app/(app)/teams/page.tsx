@@ -10,7 +10,7 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
 import { certAlerts } from '@/lib/core/alerts';
 import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
-import { canEditPerson, permsFor, roleLabel } from '@/lib/core/permissions';
+import { canEditKitOf, canEditPerson, permsFor, roleLabel } from '@/lib/core/permissions';
 import { readinessOf } from '@/lib/core/readiness';
 import { fullName, personById, rankSort, teamMembers, topicName } from '@/lib/core/selectors';
 import type { Person, TeamKey } from '@/lib/core/types';
@@ -252,6 +252,7 @@ export default function TeamsPage() {
       <div className="hapak-teams-grid">
         {(['a', 'b', 'c'] as TeamKey[]).map((tm) => {
           const members = teamMembers(db, tm);
+          const activeCount = members.filter((p) => p.status === 'active').length;
           const r = readinessOf(db, (p) => p.team_id === tm);
           const cmd = personById(db, db.teams[tm].commander_id);
           return (
@@ -262,8 +263,8 @@ export default function TeamsPage() {
                     {db.teams[tm].name}
                   </span>
                   <span style={{ fontSize: 12.5, color: 'var(--color-neutral-400)' }}>
-                    מפקד: {cmd ? fullName(cmd) : 'טרם מונה מפקד'} ·{' '}
-                    {members.filter((p) => p.status === 'active').length} פעילים · {members.length} סה״כ
+                    {cmd ? `מפקד: ${fullName(cmd)}` : 'טרם מונה מפקד'} ·{' '}
+                    {activeCount === 1 ? 'לוחם פעיל אחד' : `${activeCount} פעילים`} · {members.length} סה״כ
                   </span>
                 </div>
                 {perms.canKitReport && (
@@ -358,7 +359,7 @@ export default function TeamsPage() {
                             {pr}
                           </span>
                         )}
-                        {(canEditPerson(user, p) || perms.canEditKit) && (
+                        {(canEditPerson(user, p) || canEditKitOf(db, user, p)) && (
                           <button
                             className="btn btn-ghost"
                             style={{ fontSize: 12 }}
@@ -386,7 +387,7 @@ export default function TeamsPage() {
                 <span style={{ fontSize: 13 }}>{fullName(p)}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>{roleLabel(db, p)}</span>
               </span>
-              {(canEditPerson(user, p) || perms.canEditKit) && (
+              {(canEditPerson(user, p) || canEditKitOf(db, user, p)) && (
                 <button
                   className="btn btn-ghost"
                   style={{ fontSize: 12 }}

@@ -88,3 +88,16 @@ curl -sS "http://localhost:$PORT_APP/api/health" | head -c 120; echo
 
 say "flows"
 node e2e/flows.mjs "http://localhost:$PORT_APP"
+FLOWS=$?
+
+# the same system from every chair, on the data the flows just created
+say "roles"
+node e2e/roles.mjs "http://localhost:$PORT_APP"
+ROLES=$?
+
+# and what each of them can take through the API, with the screen out of the way
+say "attack"
+node e2e/attack.mjs "http://localhost:$PORT_APP" "http://localhost:$PORT_SHIM" "$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+ATTACK=$?
+
+exit $(( FLOWS + ROLES + ATTACK ))

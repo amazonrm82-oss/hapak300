@@ -58,6 +58,11 @@ async function rpc(fn: string, args: Record<string, unknown> = {}): Promise<void
   check(error);
 }
 
+/**
+ * Best-effort on purpose: an announcement that did not go out must not fail the
+ * action it was announcing. The training was created either way, and the
+ * reminder job carries the same news on its next run.
+ */
 async function notify(text: string, to: string[] | null, trainingId: string | null): Promise<void> {
   await sb().from('notifications').insert({ text, to, training_id: trainingId });
 }
@@ -283,6 +288,8 @@ async function ensureTopic(db: Db, f: TrainingForm): Promise<string> {
   return id;
 }
 
+/** Remembers a new location for next time. Best-effort: it is a convenience,
+ *  and a training must not fail to save because a catalog row did not. */
 async function ensureLocation(db: Db, location: string): Promise<void> {
   const loc = location.trim();
   if (!loc || db.locations.includes(loc)) return;
@@ -349,12 +356,18 @@ export async function updateTraining(db: Db, t: TrainingFull, f: TrainingForm): 
   };
 
   if (t.start !== f.start || t.end !== f.end) {
-    await sb().from('day_blocks').delete().eq('training_id', t.id);
-    await sb()
-      .from('day_blocks')
-      .insert(
-        defaultDayBlocks(f.start, f.end, topicId).map((b, i) => ({ ...b, training_id: t.id, sort: i })),
-      );
+    // the day plan is rewritten to the new hours; a refusal here has to be
+    // heard, or the times move and the plan silently stays on the old ones
+    check((await sb().from('day_blocks').delete().eq('training_id', t.id)).error);
+    check(
+      (
+        await sb()
+          .from('day_blocks')
+          .insert(
+            defaultDayBlocks(f.start, f.end, topicId).map((b, i) => ({ ...b, training_id: t.id, sort: i })),
+          )
+      ).error,
+    );
   }
 
   if (patch.departure !== t.departure)
@@ -392,13 +405,17 @@ export async function patchTraining(
     const start = key === 'start' ? value : t.start;
     const end = key === 'end' ? value : t.end;
     patch.departure = addMinutes(start, -DEPARTURE_LEAD_MINUTES);
-    await sb().from('day_blocks').delete().eq('training_id', t.id);
-    await sb()
-      .from('day_blocks')
-      .insert(
-        defaultDayBlocks(start, end, t.topic_id).map((b, i) => ({ ...b, training_id: t.id, sort: i })),
-      );
-    await sb().from('vehicles').update({ departure: patch.departure }).eq('training_id', t.id);
+    check((await sb().from('day_blocks').delete().eq('training_id', t.id)).error);
+    check(
+      (
+        await sb()
+          .from('day_blocks')
+          .insert(
+            defaultDayBlocks(start, end, t.topic_id).map((b, i) => ({ ...b, training_id: t.id, sort: i })),
+          )
+      ).error,
+    );
+    check((await sb().from('vehicles').update({ departure: patch.departure }).eq('training_id', t.id)).error);
   } else if (key === 'topic_id') {
     patch.topic_id = value;
     patch.safety = topicSafety(db, value) || t.safety;
@@ -678,7 +695,9 @@ export async function addAmmo(
     .from('ammo')
     .insert({ training_id: t.id, weapon, per_fighter: perFighter, allocated, sort: 999 });
   check(error);
-  await sb().from('trainings').update({ ammo_signed: false }).eq('id', t.id);
+  // the signature is void once the amounts change — if this write is refused
+  // the screen would go on showing signed-for ammunition that nobody signed for
+  check((await sb().from('trainings').update({ ammo_signed: false }).eq('id', t.id)).error);
 }
 
 export async function setAmmoField(
@@ -693,7 +712,8 @@ export async function setAmmoField(
   if (key === 'per_fighter' && value) patch.allocated = value * participants(db, t).length;
   const { error } = await sb().from('ammo').update(patch).eq('id', id);
   check(error);
-  if (key !== 'used') await sb().from('trainings').update({ ammo_signed: false }).eq('id', t.id);
+  if (key !== 'used')
+    check((await sb().from('trainings').update({ ammo_signed: false }).eq('id', t.id)).error);
 }
 
 export async function signAmmo(t: TrainingFull, user: Person): Promise<boolean> {
@@ -863,6 +883,7 @@ export interface PersonForm {
   is_instructor: boolean;
   is_admin: boolean;
   is_hapak_commander: boolean;
+  is_driver: boolean;
   qual: string[];
   certs: Record<string, string>;
   weapon: string;
@@ -909,6 +930,7 @@ export async function savePerson(
     is_instructor: form.is_instructor || form.qual.length > 0,
     is_admin: form.is_admin,
     is_hapak_commander: form.is_hapak_commander,
+    is_driver: form.is_driver,
     qual: form.qual,
     certs,
     weapon: form.weapon.trim(),
@@ -961,7 +983,7 @@ export async function savePerson(
             .eq('id', o.id),
         ),
     );
-    await sb().from('teams').update({ commander_id: id }).eq('id', teamId);
+    check((await sb().from('teams').update({ commander_id: id }).eq('id', teamId)).error);
   }
 }
 

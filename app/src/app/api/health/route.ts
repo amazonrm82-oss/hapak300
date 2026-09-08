@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { admin } from '@/lib/server/admin';
+import { admin, anon } from '@/lib/server/admin';
 import { vapidSubject } from '@/lib/server/push';
 
 /**
@@ -13,7 +13,19 @@ import { vapidSubject } from '@/lib/server/push';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Anyone on the internet can reach this — it has to work before a single
+  // person can sign in, which is exactly when it is needed. So it says whether
+  // the deployment is configured and whether the roster loaded, but the numbers
+  // themselves — how many fighters, how many phones — are only for someone who
+  // has signed in. A headcount is not a configuration detail.
+  const token = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+  let insider = false;
+  if (token) {
+    const { data } = await anon().auth.getUser(token);
+    insider = !!data?.user?.app_metadata?.person_id;
+  }
+  const counted = (n: number) => (insider ? n : n > 0 ? 'יש' : 0);
   const env = {
     NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -114,7 +126,7 @@ export async function GET() {
           ok: false,
           problem: `החיבור תקין, אבל חסרים סודות הכניסה: ${missing.join(', ')}`,
           fix: 'Vercel → Settings → Environment Variables → הוסף → Redeploy',
-          people_count: count,
+          people_count: counted(count ?? 0),
           ...context,
         },
         { status: 500 },
@@ -127,9 +139,11 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      message: `הכול תקין — ${count} אנשים במערכת. אפשר להיכנס.`,
-      people_count: count,
-      push_devices: subs ?? 0,
+      message: insider
+        ? `הכול תקין — ${count} אנשים במערכת. אפשר להיכנס.`
+        : 'הכול תקין — יש לוחמים במערכת. אפשר להיכנס.',
+      people_count: counted(count ?? 0),
+      push_devices: counted(subs ?? 0),
       ...context,
     });
   } catch (e) {
