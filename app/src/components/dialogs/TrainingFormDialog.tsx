@@ -63,6 +63,9 @@ const proposeLogistics = (
     mode,
   );
 
+/** Nothing is chosen for the commander; he adds what the day needs. */
+const EMPTY_LOGISTICS: LogisticsDraft = { gear: [], vehicles: [], ammo: [], food: [] };
+
 /** What the gathering time would be if nobody sets one. */
 const suggestedDeparture = (start: string): string =>
   /^([01]\d|2[0-3]):[0-5]\d$/.test(start) ? addMinutes(start, -DEPARTURE_LEAD_MINUTES) : '';
@@ -76,7 +79,6 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
   // The kit proposal follows the topic, team, time and location until the
   // commander edits it — after that their list is the one that counts.
   const [logi, setLogi] = useState<LogisticsDraft | null>(null);
-  const [logiTouched, setLogiTouched] = useState(false);
 
   useEffect(() => {
     if (!open || !db) return;
@@ -110,18 +112,17 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
       );
     }
     setLogi(null);
-    setLogiTouched(false);
   }, [open, training, db, week]);
 
-  // A new training gets a live proposal, refreshed only when one of the four
-  // inputs it depends on changes; an existing training keeps its own logistics,
-  // edited on the training's logistics tab.
-  const inputs = f ? [f.topic_id, f.team_id, f.start, f.location, f.date, f.fire_mode].join('|') : '';
+  // A new training starts with nothing chosen. The system used to fill the kit
+  // in by itself — three vehicles, ammunition by topic — and a list somebody
+  // else wrote is a list nobody reads: it gets published as-is, and then the
+  // wrong vehicle turns up. What the commander adds is what the team gets. The
+  // proposal is still there, one button away, for whoever wants it.
   useEffect(() => {
-    if (!open || !db || training || logiTouched || !inputs) return;
-    const [topic, team, start, location, date, mode] = inputs.split('|');
-    setLogi(proposeLogistics(db, topic, team as TrainingTeam, start, location, date, mode as FireMode));
-  }, [open, db, training, logiTouched, inputs]);
+    if (!open || !db || training) return;
+    setLogi((cur) => cur ?? EMPTY_LOGISTICS);
+  }, [open, db, training]);
 
   if (!open || !db || !user || !f) return null;
 
@@ -176,7 +177,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
       body={
         training
           ? 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות.'
-          : 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות. הציוד, הרכבים, התחמושת והמזון ממולאים למטה כהצעה — ערוך לפני השמירה.'
+          : 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות. הציוד, הרכבים, התחמושת והמזון מתווספים למטה — מה שתוסיף הוא מה שהצוות יראה.'
       }
       actions={
         <>
@@ -334,11 +335,9 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
           db={db}
           value={logi}
           onChange={(next) => {
-            setLogiTouched(true);
             setLogi(next);
           }}
           onReset={() => {
-            setLogiTouched(false);
             setLogi(proposeLogistics(db, f.topic_id, f.team_id, f.start, f.location, f.date, f.fire_mode));
           }}
         />

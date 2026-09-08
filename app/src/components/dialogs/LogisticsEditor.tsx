@@ -56,10 +56,11 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12.5, color: 'var(--color-neutral-500)', flex: 1, minWidth: 200 }}>
-          המערכת מילאה הצעה לפי הנושא וגודל הכוח. ערוך כאן — מה שיישמר יוצג לכל הצוות.
+          הוסף כאן את מה שהאימון צריך — מה שיישמר יוצג לכל הצוות. אפשר גם למלא הצעה לפי
+          הנושא וגודל הכוח, ולערוך אותה.
         </span>
         <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onReset}>
-          החזר להצעת המערכת
+          מלא הצעה לפי הנושא
         </button>
       </div>
 

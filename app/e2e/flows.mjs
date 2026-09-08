@@ -257,8 +257,16 @@ try {
     modeOptions.includes('רטוב') && modeOptions.includes('חלקי') && modeOptions.includes('יבש'),
   );
 
-  check('הצעת הלוגיסטיקה מופיעה בטופס', await has('ציוד נדרש'));
+  // nothing is chosen for him: the sections are there, empty, and the proposal
+  // is a button he presses if he wants it
+  check('הלוגיסטיקה מופיעה בטופס', await has('ציוד נדרש'));
   check('ובתוכה מזון ומים ותחמושת', (await has('מזון ומים')) && (await has('תחמושת')));
+  // every row in the kit lists carries a ✕; with nothing chosen there are none
+  const kitRows = () => page.locator('[role="dialog"] button[aria-label="הסרת שורה"]').count();
+  check('ואין שום דבר שנבחר מראש', (await kitRows()) === 0);
+  await click('מלא הצעה לפי הנושא');
+  await settle(1000);
+  check('וכפתור ההצעה ממלא אותן למי שרוצה', (await kitRows()) > 0);
 
   await click('שמירה ופרסום');
   await settle(2500);
