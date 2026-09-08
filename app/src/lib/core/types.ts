@@ -177,6 +177,33 @@ export interface Photo {
   by: string;
 }
 
+/** A station inside a training: ירי בעמידה, ירי בתנועה, החלפת מחסנית. */
+export interface Drill {
+  id: string;
+  name: string;
+  description: string;
+  kind: 'hits' | 'score' | 'passfail';
+  /** Rounds a fighter is expected to fire, for prefilling and the ammo plan. */
+  rounds: number;
+  /** How much this station counts in the training's average. */
+  weight: number;
+  sort: number;
+  /** Results by person id. */
+  results: Record<string, DrillResult>;
+}
+
+export interface DrillResult {
+  id: string;
+  person_id: string;
+  shots: number | null;
+  hits: number | null;
+  /** 0–100. Written by the database for a hits drill, entered for the others. */
+  score: number | null;
+  note: string;
+  by_id: string | null;
+  at: string;
+}
+
 export interface TrainingSummary {
   commander: string;
   instructor: string;
@@ -222,6 +249,9 @@ export interface Training {
   ammo_signed_by: string | null;
   ammo_signed_at: string | null;
   cancel_reason: string;
+  /** The commander's grade for the training as a whole, 0–100. */
+  grade: number | null;
+  grade_note: string;
   summary: TrainingSummary;
   created_at: string;
   updated_at: string;
@@ -238,6 +268,7 @@ export interface TrainingFull extends Training {
   chat: ChatMessage[];
   feedback: Record<string, Feedback>;
   photos: Photo[];
+  drills: Drill[];
   approval_log: ApprovalEntry[];
 }
 

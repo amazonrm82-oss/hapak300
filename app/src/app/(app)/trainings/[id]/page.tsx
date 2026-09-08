@@ -10,6 +10,7 @@ import { AttendanceTab } from '@/components/training/AttendanceTab';
 import { ChatTab } from '@/components/training/ChatTab';
 import { LogisticsTab } from '@/components/training/LogisticsTab';
 import { OverviewTab } from '@/components/training/OverviewTab';
+import { DrillsTab } from '@/components/training/DrillsTab';
 import { SummaryTab } from '@/components/training/SummaryTab';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field, Tag } from '@/components/ui/bits';
@@ -43,7 +44,7 @@ import {
 } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
-type Tab = 'overview' | 'attendance' | 'logistics' | 'chat' | 'summary';
+type Tab = 'overview' | 'attendance' | 'drills' | 'logistics' | 'chat' | 'summary';
 
 export default function TrainingPage({ params }: { params: { id: string } }) {
   const app = useApp();
@@ -88,6 +89,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
   const tabs: [Tab, string][] = [
     ['overview', 'סקירה'],
     ['attendance', `נוכחות ${st.responded}/${st.total}`],
+    ['drills', t.drills.length ? `מקצים (${t.drills.length})` : 'מקצים'],
     ['logistics', 'לוגיסטיקה ותחמושת'],
     ['chat', unreadChat ? `צ׳אט (${unreadChat})` : 'צ׳אט'],
     ['summary', 'סיכום'],
@@ -241,6 +243,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
       )}
       {tab === 'logistics' && <LogisticsTab training={t} />}
       {tab === 'chat' && <ChatTab training={t} />}
+      {tab === 'drills' && <DrillsTab training={t} />}
       {tab === 'summary' && <SummaryTab training={t} />}
 
       {(marking || markPerson) && (

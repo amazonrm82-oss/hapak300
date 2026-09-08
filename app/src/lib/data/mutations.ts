@@ -22,6 +22,7 @@ import type {
   AttStatus,
   CalendarEvent,
   Db,
+  Drill,
   Fitness,
   FleetVehicle,
   InviteRole,
@@ -447,6 +448,86 @@ export const invitePerson = (tid: string, role: InviteRole, pid: string) =>
 
 export const respondInvite = (tid: string, role: InviteRole, accept: boolean) =>
   rpc('respond_invite', { tid, role, accept });
+
+// ── drills ─────────────────────────────────────────────────────────────────
+// The stations a training is made of, and what each fighter did at them.
+
+export interface DrillForm {
+  name: string;
+  description: string;
+  kind: Drill['kind'];
+  rounds: number;
+  weight: number;
+}
+
+export async function saveDrill(tid: string, f: DrillForm, id: string | null): Promise<void> {
+  const name = f.name.trim();
+  if (!name) throw new Error('נדרש שם למקצה');
+  const row = {
+    training_id: tid,
+    name,
+    description: f.description.trim(),
+    kind: f.kind,
+    rounds: Math.max(0, Math.round(f.rounds) || 0),
+    weight: Math.min(10, Math.max(0.1, Number(f.weight) || 1)),
+  };
+  const { error } = id
+    ? await sb().from('drills').update(row).eq('id', id)
+    : await sb().from('drills').insert({ ...row, sort: 999 });
+  check(error);
+}
+
+export async function removeDrill(id: string): Promise<void> {
+  const { error } = await sb().from('drills').delete().eq('id', id);
+  check(error);
+}
+
+/**
+ * One fighter's result at one station.
+ *
+ * The score is not sent: for a hits drill the database computes it from the
+ * counts, so two screens can never disagree about what 12 of 20 is worth.
+ */
+export async function saveDrillResult(
+  drill: Drill,
+  personId: string,
+  by: string,
+  v: { shots?: number | null; hits?: number | null; score?: number | null; note?: string },
+): Promise<void> {
+  if (drill.kind === 'hits' && v.shots != null && v.hits != null && v.hits > v.shots)
+    throw new Error('לא ייתכן שמספר הפגיעות גדול ממספר הכדורים שנורו');
+
+  const { error } = await sb().from('drill_results').upsert(
+    {
+      drill_id: drill.id,
+      person_id: personId,
+      shots: v.shots ?? null,
+      hits: v.hits ?? null,
+      score: drill.kind === 'hits' ? null : (v.score ?? null),
+      note: v.note ?? '',
+      by_id: by,
+      at: new Date().toISOString(),
+    },
+    { onConflict: 'drill_id,person_id' },
+  );
+  check(error);
+}
+
+export async function clearDrillResult(drillId: string, personId: string): Promise<void> {
+  const { error } = await sb()
+    .from('drill_results')
+    .delete()
+    .eq('drill_id', drillId)
+    .eq('person_id', personId);
+  check(error);
+}
+
+/** The commander's grade for the training as a whole, 0–100. */
+export async function setTrainingGrade(tid: string, value: number | null, note: string) {
+  if (value !== null && (value < 0 || value > 100))
+    throw new Error('ציון האימון חייב להיות בין 0 ל-100');
+  await rpc('set_training_grade', { tid, value, note });
+}
 
 // ── logistics ──────────────────────────────────────────────────────────────
 

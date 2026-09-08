@@ -53,6 +53,8 @@ const WATCHED = [
   'join_requests',
   'fleet',
   'periods',
+  'drills',
+  'drill_results',
 ];
 
 export function DataProvider({ children }: { children: ReactNode }) {

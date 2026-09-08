@@ -602,3 +602,82 @@ do $t$ begin
 exception when others then
   raise notice '✅  84  אי אפשר ליצור אימון של סדיר בלבד';
 end $t$;
+
+-- ════════ מקצים: הציון מחושב, ולא נכתב פעמיים ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+set role authenticated;
+
+insert into drills (training_id, name, description, kind, rounds, weight)
+values ((select id from trainings limit 1), 'ירי בעמידה', '20 כדורים, 5 מטרות, 50 מ׳', 'hits', 20, 1);
+
+insert into drill_results (drill_id, person_id, shots, hits)
+values ((select id from drills where name = 'ירי בעמידה'),
+        (select id from people_view where name = 'דניאל כץ'), 20, 17);
+
+select case when (select score from drill_results limit 1) = 85.00
+            then '✅' else '❌' end || '  85  הציון מחושב מהפגיעות (17/20 = 85)';
+
+do $t$ begin
+  insert into drill_results (drill_id, person_id, shots, hits)
+  values ((select id from drills where name = 'ירי בעמידה'),
+          (select id from people_view where name = 'איתי רוזן'), 10, 12);
+  raise notice '❌  86  התקבלו יותר פגיעות מכדורים';
+exception when others then
+  raise notice '✅  86  יותר פגיעות מכדורים נדחה';
+end $t$;
+
+-- a manual score is taken as given, and pass/fail collapses to 100 or 0
+insert into drills (training_id, name, kind) values
+  ((select id from trainings limit 1), 'תרגול תקלות', 'score'),
+  ((select id from trainings limit 1), 'בדיקת נשק', 'passfail');
+
+insert into drill_results (drill_id, person_id, score)
+values ((select id from drills where name = 'תרגול תקלות'),
+        (select id from people_view where name = 'דניאל כץ'), 72),
+       ((select id from drills where name = 'בדיקת נשק'),
+        (select id from people_view where name = 'דניאל כץ'), 80);
+
+select case when (select score from drill_results r join drills d on d.id = r.drill_id
+                   where d.name = 'תרגול תקלות') = 72
+            then '✅' else '❌' end || '  87  ציון ידני נשמר כפי שהוזן';
+select case when (select score from drill_results r join drills d on d.id = r.drill_id
+                   where d.name = 'בדיקת נשק') = 100
+            then '✅' else '❌' end || '  88  ״עבר/לא עבר״ נשמר כ-100';
+
+-- a void function returns an empty string, not null, so the call is checked by
+-- whether it raises rather than by what it returns
+do $t$ begin
+  perform set_training_grade((select id from trainings limit 1), 88, 'אימון טוב');
+  raise notice '✅  89  מפקד נותן ציון לאימון';
+exception when others then
+  raise notice '❌  89  מתן ציון נכשל — %', sqlerrm;
+end $t$;
+select case when (select grade from trainings limit 1) = 88
+            then '✅' else '❌' end || '  90  ציון האימון נשמר';
+
+reset role; reset request.jwt.claim.sub;
+
+-- a fighter may see their own result and record nothing
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+select case when (select count(*) from drill_results) = 3
+            then '✅' else '❌' end || '  91  הלוחם רואה את התוצאות שלו';
+
+do $t$ begin
+  update drill_results set hits = 20;
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  92  לוחם שינה תוצאה של מקצה — כשל אבטחה';
+exception when others then
+  raise notice '✅  92  לוחם נחסם משינוי תוצאות';
+end $t$;
+
+do $t$ begin
+  perform set_training_grade((select id from trainings limit 1), 100, '');
+  raise notice '❌  93  לוחם נתן ציון לאימון — כשל אבטחה';
+exception when others then
+  raise notice '✅  93  לוחם נחסם ממתן ציון לאימון';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

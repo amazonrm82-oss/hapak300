@@ -8,6 +8,7 @@ import {
   topicName,
   trainingTitle,
 } from './selectors';
+import { resultScore, scoresFor, trainingScore } from './drills';
 import type { Db, TrainingFull } from './types';
 
 // Quotes are escaped too: this output is also read inside attributes, and a
@@ -261,5 +262,66 @@ export function periodReportHTML(db: Db, fromISO: string, toISO: string, title: 
         ]),
     ) +
     `</tbody></table>`
+  );
+}
+
+/**
+ * The drill results of one training, for printing or filing.
+ *
+ * A station's own numbers next to what they added up to — the record a range
+ * officer would otherwise write out by hand.
+ */
+export function drillsHTML(db: Db, t: TrainingFull): string {
+  if (!t.drills.length) return '';
+
+  const total = trainingScore(db, t);
+  const rows_ = scoresFor(db, t);
+
+  const perDrill = t.drills
+    .map((d) => {
+      const body = rows(
+        rows_
+          .map((r) => {
+            const res = d.results[r.person.id];
+            const score = resultScore(d, res);
+            return [
+              fullName(r.person),
+              d.kind === 'hits' ? (res?.shots ?? '—') : '',
+              d.kind === 'hits' ? (res?.hits ?? '—') : '',
+              score === null ? '—' : score.toFixed(1),
+              res?.note ?? '',
+            ];
+          })
+          .filter((row) => row[3] !== '—' || row[4]),
+      );
+      return (
+        `<h2 style="margin-top:16px">${esc(d.name)}</h2>` +
+        (d.description ? `<p class="muted">${esc(d.description)}</p>` : '') +
+        `<table><thead><tr><th>לוחם</th><th>כדורים</th><th>פגיעות</th><th>ציון</th><th>הערה</th></tr></thead>` +
+        `<tbody>${body}</tbody></table>`
+      );
+    })
+    .join('');
+
+  return (
+    `<h1>מקצים וציונים · ${esc(trainingTitle(db, t))}</h1>` +
+    `<h2>${esc(topicName(db, t.topic_id))} · ${esc(dateLine(t))}</h2>` +
+    `<p class="muted">ממוצע הצוות: ${total.team === null ? '—' : total.team.toFixed(1)} · ` +
+    `${total.scored} מתוך ${total.participants} לוחמים נמדדו` +
+    (total.shots ? ` · ירי ${total.hits}/${total.shots}` : '') +
+    (t.grade !== null ? ` · ציון המפקד לאימון: ${t.grade}` : '') +
+    `</p>` +
+    `<table><thead><tr><th>לוחם</th><th>תפקיד</th><th>מקצים</th><th>ציון מקצים</th><th>ציון מפקד</th></tr></thead><tbody>` +
+    rows(
+      rows_.map((r) => [
+        fullName(r.person),
+        r.person.role,
+        `${r.done}/${r.total}`,
+        r.score === null ? '—' : r.score.toFixed(1),
+        t.attendance[r.person.id]?.rating ?? '—',
+      ]),
+    ) +
+    `</tbody></table>` +
+    perDrill
   );
 }

@@ -744,9 +744,22 @@ where me_id() is not null or auth.uid() is null;
   end if;
 end $view$;
 
+-- Skipped once a later patch has widened it: replacing a view with a different
+-- column order is refused outright, and running the patches out of order should
+-- not be a trap.
+do $tv$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_name = 'trainings_view' and column_name = 'grade'
+  ) then
+    execute $sql$
 create or replace view trainings_view as
 select t.*, coalesce(s.seq, 0) as seq
 from trainings t
 left join trainings_seq s on s.id = t.id
 where me_id() is not null or auth.uid() is null;
+    $sql$;
+  end if;
+end $tv$;
 

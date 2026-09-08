@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase/client';
 import type {
   Attendance,
   Db,
+  Drill,
+  DrillResult,
   Person,
   Settings,
   Team,
@@ -43,6 +45,8 @@ export async function loadDb(): Promise<Db> {
     locations,
     fleet,
     periods,
+    drills,
+    drillResults,
   ] = await Promise.all([
     sb.from('settings').select('*').single(),
     sb.from('teams').select('*'),
@@ -68,6 +72,8 @@ export async function loadDb(): Promise<Db> {
     sb.from('locations').select('name').order('sort'),
     sb.from('fleet').select('*').order('sort'),
     sb.from('periods').select('*').order('closed_at', { ascending: false }),
+    sb.from('drills').select('*').order('sort'),
+    sb.from('drill_results').select('*'),
   ]);
 
   const firstError = [settings, teams, topics, people, trainings].find((r) => r.error)?.error;
@@ -92,6 +98,15 @@ export async function loadDb(): Promise<Db> {
   const chatBy = byTraining(chat.data as never[]);
   const fbBy = byTraining(feedback.data as never[]);
   const photoBy = byTraining(photos.data as never[]);
+  const drillBy = byTraining(drills.data as never[]);
+
+  // results hang off the drill, not the training, so they are grouped once here
+  const resultsByDrill = new Map<string, Record<string, DrillResult>>();
+  for (const r of (drillResults.data ?? []) as (DrillResult & { drill_id: string })[]) {
+    const bucket = resultsByDrill.get(r.drill_id) ?? {};
+    bucket[r.person_id] = r;
+    resultsByDrill.set(r.drill_id, bucket);
+  }
 
   const readSet = new Set((reads.data ?? []).map((r: { notification_id: string }) => r.notification_id));
 
@@ -153,6 +168,8 @@ export async function loadDb(): Promise<Db> {
       ammo_signed_by: (t.ammo_signed_by as string) ?? null,
       ammo_signed_at: t.ammo_signed_at ? stamp(t.ammo_signed_at as string) : null,
       cancel_reason: (t.cancel_reason as string) ?? '',
+      grade: (t.grade as number) ?? null,
+      grade_note: (t.grade_note as string) ?? '',
       summary: (t.summary as TrainingFull['summary']) ?? {
         commander: '',
         instructor: '',
@@ -183,6 +200,16 @@ export async function loadDb(): Promise<Db> {
         name: p.name as string,
         url: (p.path as string) ?? null,
         by: (p.by_id as string) ?? '',
+      })),
+      drills: (drillBy.get(id) ?? []).map((d: Record<string, unknown>) => ({
+        id: d.id as string,
+        name: d.name as string,
+        description: (d.description as string) ?? '',
+        kind: d.kind as Drill['kind'],
+        rounds: (d.rounds as number) ?? 0,
+        weight: Number(d.weight ?? 1),
+        sort: (d.sort as number) ?? 0,
+        results: resultsByDrill.get(d.id as string) ?? {},
       })),
     };
   });
