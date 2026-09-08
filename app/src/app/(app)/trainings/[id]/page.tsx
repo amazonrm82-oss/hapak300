@@ -26,7 +26,7 @@ import {
   orderText,
   printHTML,
 } from '@/lib/core/exports';
-import { permsFor } from '@/lib/core/permissions';
+import { permsFor, canMarkAttendance } from '@/lib/core/permissions';
 import {
   attendanceStats,
   byId,
@@ -85,7 +85,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
   const isLive = t.status !== 'done' && t.status !== 'cancelled';
   const isPart = participants(db, t).some((p) => p.id === user.id);
   const mine = t.attendance[user.id];
-  const canMark = isPart && isLive && today <= t.date;
+  const canMark = isPart && canMarkAttendance(db, user, t, user.id, today);
   const unreadChat = t.chat.filter((m) => !m.read_by.includes(user.id)).length;
 
   const tabs: [Tab, string][] = [

@@ -33,6 +33,7 @@ import {
   upcomingFor,
 } from '@/lib/core/selectors';
 import type { TeamKey, TrainingFull } from '@/lib/core/types';
+import { canMarkAttendance } from '@/lib/core/permissions';
 import { useApp } from '@/lib/data/provider';
 
 /**
@@ -151,7 +152,7 @@ export default function SchedulePage() {
               </span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {isPart && !mine && today <= t.date && (
+              {isPart && canMarkAttendance(db, user, t, user.id, today) && (
                 <button className="btn btn-primary" onClick={() => setMarkTraining(t)} style={{ whiteSpace: 'nowrap' }}>
                   סימון נוכחות
                 </button>
@@ -197,8 +198,7 @@ export default function SchedulePage() {
           </span>
           <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
             {participants(db, next).some((p) => p.id === user.id) &&
-              today <= next.date &&
-              next.status !== 'done' && (
+              canMarkAttendance(db, user, next, user.id, today) && (
                 <button className="btn btn-primary" onClick={() => setMarkTraining(next)} style={{ whiteSpace: 'nowrap' }}>
                   {next.attendance[user.id] ? 'עדכון נוכחות' : 'סימון נוכחות'}
                 </button>

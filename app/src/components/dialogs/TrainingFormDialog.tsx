@@ -5,12 +5,12 @@ import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { LogisticsEditor, type LogisticsDraft } from '@/components/dialogs/LogisticsEditor';
 import { Field } from '@/components/ui/bits';
-import { DEFAULT_FREQ, DEFAULT_PICKUP, DEPARTURE_LEAD_MINUTES } from '@/lib/core/constants';
+import { DEFAULT_FREQ, DEFAULT_PICKUP, DEPARTURE_LEAD_MINUTES, FIRE_MODES } from '@/lib/core/constants';
 import { addDays, addMinutes, weekStart } from '@/lib/core/dates';
 import { defaultLogistics } from '@/lib/core/defaults';
 import { roleLabel } from '@/lib/core/permissions';
 import { fullName, topicName, topicSafety } from '@/lib/core/selectors';
-import type { Db, TrainingFull, TrainingTeam } from '@/lib/core/types';
+import type { Db, FireMode, TrainingFull, TrainingTeam } from '@/lib/core/types';
 import { createTraining, updateTraining, type TrainingForm } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
@@ -35,6 +35,7 @@ const blank = (topicId: string, safety: string, date: string): TrainingForm => (
   freq: DEFAULT_FREQ,
   pickup: DEFAULT_PICKUP,
   departure: '',
+  fire_mode: 'wet',
   safety,
   notes: '',
 });
@@ -47,6 +48,7 @@ const proposeLogistics = (
   start: string,
   location: string,
   date: string,
+  mode: FireMode,
 ): LogisticsDraft =>
   defaultLogistics(
     topicId === '__new' ? '' : topicId,
@@ -58,6 +60,7 @@ const proposeLogistics = (
       .filter((t) => t.attends_all)
       .map((t) => t.id),
     date,
+    mode,
   );
 
 /** What the gathering time would be if nobody sets one. */
@@ -92,6 +95,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         freq: training.freq,
         pickup: training.pickup,
         departure: training.departure,
+        fire_mode: training.fire_mode,
         safety: training.safety,
         notes: training.notes,
       });
@@ -112,11 +116,11 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
   // A new training gets a live proposal, refreshed only when one of the four
   // inputs it depends on changes; an existing training keeps its own logistics,
   // edited on the training's logistics tab.
-  const inputs = f ? [f.topic_id, f.team_id, f.start, f.location, f.date].join('|') : '';
+  const inputs = f ? [f.topic_id, f.team_id, f.start, f.location, f.date, f.fire_mode].join('|') : '';
   useEffect(() => {
     if (!open || !db || training || logiTouched || !inputs) return;
-    const [topic, team, start, location, date] = inputs.split('|');
-    setLogi(proposeLogistics(db, topic, team as TrainingTeam, start, location, date));
+    const [topic, team, start, location, date, mode] = inputs.split('|');
+    setLogi(proposeLogistics(db, topic, team as TrainingTeam, start, location, date, mode as FireMode));
   }, [open, db, training, logiTouched, inputs]);
 
   if (!open || !db || !user || !f) return null;
@@ -282,6 +286,20 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
           </select>
         </Field>
 
+        <Field label="סוג האימון">
+          <select
+            className="input"
+            value={f.fire_mode}
+            onChange={(e) => setF((s) => (s ? { ...s, fire_mode: e.target.value as FireMode } : s))}
+          >
+            {FIRE_MODES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label} — {m.note}
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <Field label="תדרי קשר">
           <input className="input" value={f.freq} onChange={set('freq')} />
         </Field>
@@ -321,7 +339,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
           }}
           onReset={() => {
             setLogiTouched(false);
-            setLogi(proposeLogistics(db, f.topic_id, f.team_id, f.start, f.location, f.date));
+            setLogi(proposeLogistics(db, f.topic_id, f.team_id, f.start, f.location, f.date, f.fire_mode));
           }}
         />
       )}

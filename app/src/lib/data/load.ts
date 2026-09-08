@@ -171,6 +171,7 @@ export async function loadDb(): Promise<Db> {
       ammo_signed_by: (t.ammo_signed_by as string) ?? null,
       ammo_signed_at: t.ammo_signed_at ? stamp(t.ammo_signed_at as string) : null,
       cancel_reason: (t.cancel_reason as string) ?? '',
+      fire_mode: (t.fire_mode as TrainingFull['fire_mode']) ?? 'wet',
       grade: (t.grade as number) ?? null,
       grade_note: (t.grade_note as string) ?? '',
       summary: (t.summary as TrainingFull['summary']) ?? {

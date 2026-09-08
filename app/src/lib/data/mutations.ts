@@ -20,6 +20,7 @@ import {
 } from '@/lib/core/selectors';
 import type {
   AttStatus,
+  FireMode,
   CalendarEvent,
   Db,
   Drill,
@@ -178,6 +179,8 @@ export interface TrainingForm {
   pickup: string;
   /** When the force gathers at the pickup point. Blank falls back to 90 minutes before the start. */
   departure: string;
+  /** Live rounds, blanks and smoke only, or nothing at all. */
+  fire_mode: FireMode;
   safety: string;
   notes: string;
   /** Filled in on the create form; when absent the topic defaults are used. */
@@ -217,6 +220,7 @@ function draftFor(db: Db, o: {
   notes?: string;
   status?: 'planned' | 'published';
   departure?: string;
+  fire_mode?: FireMode;
   gear?: NewGear[];
   vehicles?: NewVehicle[];
   ammo?: NewAmmo[];
@@ -236,6 +240,7 @@ function draftFor(db: Db, o: {
     o.location,
     attendsAllTeams(db),
     o.date,
+    o.fire_mode ?? 'wet',
   );
   const logi = {
     gear: o.gear ?? defaults.gear,
@@ -259,6 +264,7 @@ function draftFor(db: Db, o: {
     safety: o.safety || topicSafety(db, o.topic_id),
     pickup: o.pickup ?? DEFAULT_PICKUP,
     departure,
+    fire_mode: o.fire_mode ?? 'wet',
     notes: o.notes ?? '',
     day_blocks: defaultDayBlocks(o.start, o.end, o.topic_id),
     ...logi,
@@ -338,6 +344,7 @@ export async function updateTraining(db: Db, t: TrainingFull, f: TrainingForm): 
     freq: f.freq,
     pickup: f.pickup,
     departure: f.departure || addMinutes(f.start, -DEPARTURE_LEAD_MINUTES),
+    fire_mode: f.fire_mode,
     notes: f.notes,
   };
 

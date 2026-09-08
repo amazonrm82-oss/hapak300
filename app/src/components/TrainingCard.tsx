@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { STATUS_LABEL, TRAINING_STATUS } from '@/lib/core/constants';
 import { trainingAlerts } from '@/lib/core/alerts';
 import { dateLine, pad, relDays, weekOf } from '@/lib/core/dates';
-import { permsFor } from '@/lib/core/permissions';
+import { permsFor, canMarkAttendance } from '@/lib/core/permissions';
 import {
   attendanceStats,
   fullName,
@@ -77,7 +77,7 @@ export function cardData(
         ? 'טרם סימנת נוכחות'
         : '',
     isPart,
-    canMark: isPart && t.status !== 'done' && t.status !== 'cancelled' && today <= t.date,
+    canMark: isPart && canMarkAttendance(db, user, t, user.id, today),
     markLabel: mine ? 'עדכון נוכחות' : 'סימון נוכחות',
     alerts: perms.seesStats ? trainingAlerts(db, t, today, now) : [],
     unreadChat: t.chat.filter((m) => !m.read_by.includes(user.id)).length,

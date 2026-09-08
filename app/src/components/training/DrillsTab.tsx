@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Field, SectionCard } from '@/components/ui/bits';
 import { ConfirmDialog } from '@/components/ui/Dialog';
+import { FIRE_MODE_LABEL } from '@/lib/core/constants';
 import {
   DRILL_KINDS,
   SCORE_COLOR,
@@ -27,10 +28,10 @@ import {
 } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
-const blankDrill = (): DrillForm => ({
+const blankDrill = (dry: boolean): DrillForm => ({
   name: '',
   description: '',
-  kind: 'hits',
+  kind: dry ? 'score' : 'hits',
   rounds: 0,
   weight: 1,
 });
@@ -68,6 +69,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
   // someone who did not turn up would put a number on a thing that never
   // happened; his line is decided by whether he makes the training up.
   const measured = rows.filter((r) => r.state === 'trained').map((r) => r.person);
+  const dry = t.fire_mode === 'dry';
   const total = trainingScore(db, t);
   const mine = rows.find((r) => r.person.id === user.id);
 
@@ -86,7 +88,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
 
   const startNew = () => {
     setEditing(null);
-    setForm(blankDrill());
+    setForm(blankDrill(dry));
   };
 
   const startEdit = (d: Drill) => {
@@ -103,7 +105,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
   return (
     <>
       {/* ── the result of the whole training ── */}
-      <SectionCard title="ציון האימון">
+      <SectionCard title={`ציון האימון · ${FIRE_MODE_LABEL[t.fire_mode]}`}>
         <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <Figure
             label="ממוצע הצוות במקצים"
@@ -171,6 +173,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
 
         {form && canEdit && (
           <DrillForm
+            dry={dry}
             value={form}
             onChange={setForm}
             editing={!!editing}
@@ -434,6 +437,7 @@ function DrillForm({
   busy,
   onSave,
   onCancel,
+  dry,
 }: {
   value: DrillForm;
   onChange: (next: DrillForm) => void;
@@ -441,8 +445,11 @@ function DrillForm({
   busy: boolean;
   onSave: () => void;
   onCancel: () => void;
+  /** A dry day has no rounds to allocate, so a station cannot be measured in them. */
+  dry: boolean;
 }) {
-  const kind = DRILL_KINDS.find((k) => k.id === f.kind);
+  const kinds = dry ? DRILL_KINDS.filter((k) => k.id !== 'hits') : DRILL_KINDS;
+  const kind = kinds.find((k) => k.id === f.kind) ?? kinds[0];
   return (
     <div
       style={{
@@ -469,14 +476,14 @@ function DrillForm({
             value={f.kind}
             onChange={(e) => onChange({ ...f, kind: e.target.value as DrillForm['kind'] })}
           >
-            {DRILL_KINDS.map((k) => (
+            {kinds.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.label}
               </option>
             ))}
           </select>
         </Field>
-        {f.kind === 'hits' && (
+        {f.kind === 'hits' && !dry && (
           <Field label="כדורים ללוחם (למילוי מראש)">
             <input
               className="input tabnum"
@@ -507,7 +514,10 @@ function DrillForm({
         />
       </Field>
 
-      <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>{kind?.hint}</span>
+      <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
+        {kind?.hint}
+        {dry ? ' · אימון יבש — למקצה אין הקצאת כדורים' : ''}
+      </span>
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button className="btn btn-primary" onClick={onSave} disabled={busy}>

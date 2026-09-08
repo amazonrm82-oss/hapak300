@@ -1,4 +1,4 @@
-import { STATUS_LABEL } from './constants';
+import { FIRE_MODE_LABEL, STATUS_LABEL } from './constants';
 import { dateLine, fmtFull } from './dates';
 import {
   fullName,
@@ -360,10 +360,14 @@ export function ammoText(db: Db, t: TrainingFull): string {
     `דו״ח צריכת תחמושת — ${db.settings.unit_name}`,
     `${trainingTitle(db, t)} · ${topicName(db, t.topic_id)}`,
     dateLine(t),
-    `מיקום: ${t.location}`,
+    `מיקום: ${t.location} · אימון ${FIRE_MODE_LABEL[t.fire_mode]}`,
     '',
   ];
 
+  if (t.fire_mode === 'dry') {
+    lines.push('אימון יבש — לא הוקצתה ולא נצרכה תחמושת.');
+    return lines.join('\n');
+  }
   if (u.empty) {
     lines.push('לא נרשם ירי במקצים של האימון הזה.');
     return lines.join('\n');
@@ -401,8 +405,10 @@ export function ammoHTML(db: Db, t: TrainingFull): string {
   const u = ammoUsage(db, t);
   const head =
     `<h1>דו״ח צריכת תחמושת · ${esc(trainingTitle(db, t))} · ${esc(topicName(db, t.topic_id))}</h1>` +
-    `<h2>${esc(dateLine(t))} · ${esc(t.location)}</h2>`;
+    `<h2>${esc(dateLine(t))} · ${esc(t.location)} · אימון ${esc(FIRE_MODE_LABEL[t.fire_mode])}</h2>`;
 
+  if (t.fire_mode === 'dry')
+    return `${head}<p>אימון יבש — לא הוקצתה ולא נצרכה תחמושת.</p>`;
   if (u.empty)
     return `${head}<p>לא נרשם ירי במקצים של האימון הזה.</p>`;
 

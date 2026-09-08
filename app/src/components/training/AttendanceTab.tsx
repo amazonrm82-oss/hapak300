@@ -6,7 +6,7 @@ import { trainingAlerts } from '@/lib/core/alerts';
 import { MakeupDialog } from '@/components/dialogs/MakeupDialog';
 import { STATUS_LABEL } from '@/lib/core/constants';
 import { fmtShort } from '@/lib/core/dates';
-import { permsFor } from '@/lib/core/permissions';
+import { permsFor, canMarkAttendance } from '@/lib/core/permissions';
 import {
   attendanceStats,
   fullName,
@@ -154,7 +154,7 @@ export function AttendanceTab({
             {rows.map((p) => {
               const a = t.attendance[p.id];
               const isMe = p.id === user.id;
-              const canEdit = (isMe && attOpen) || perms.canApprove || perms.isTrainCmd;
+              const canEdit = canMarkAttendance(db, user, t, p.id, today);
               return (
                 <tr key={p.id}>
                   <td>

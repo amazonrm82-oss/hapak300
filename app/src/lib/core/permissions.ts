@@ -133,16 +133,25 @@ export function roleLabel(db: Db, p: Person | null): string {
   return `${p.role} · ${team}`;
 }
 
-/** A fighter may mark only their own attendance, and only until the training starts. */
+/**
+ * Who may still set an attendance mark.
+ *
+ * A fighter answers for himself, once. After he has answered, the line is his
+ * commander's: a force built on a number that people can quietly revise the
+ * night before is not a number anyone can plan around, and "I changed it back"
+ * is exactly the argument the commander should not have to have. Changing it is
+ * a commander's update, and it is logged as one.
+ */
 export function canMarkAttendance(
   db: Db,
   user: Person,
-  t: Training,
+  t: Training & { attendance?: Record<string, unknown> },
   targetId: string,
   today: string,
 ): boolean {
   if (t.status === 'done' || t.status === 'cancelled') return false;
   const perms = permsFor(db, user, t);
-  if (targetId === user.id) return today <= t.date;
-  return perms.canApprove || perms.isTrainCmd;
+  if (perms.canApprove || perms.isTrainCmd) return true;
+  if (targetId !== user.id) return false;
+  return today <= t.date && !t.attendance?.[user.id];
 }

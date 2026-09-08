@@ -8,6 +8,9 @@ export type TeamKey = 'a' | 'b' | 'c';
 /** A training belongs to one of the two teams, or to both. סדיר never has its own. */
 export type TrainingTeam = 'a' | 'b' | 'joint';
 export type PersonStatus = 'active' | 'inactive';
+/** Whether the day fires live rounds, blanks and smoke only, or nothing at all. */
+export type FireMode = 'wet' | 'partial' | 'dry';
+
 export type TrainingStatus = 'planned' | 'published' | 'done' | 'cancelled';
 export type InviteStatus = 'pending' | 'accepted' | 'declined';
 export type AttStatus = 'coming' | 'late' | 'absent' | 'sick' | 'reserve' | 'other';
@@ -252,6 +255,7 @@ export interface Training {
   ammo_signed_by: string | null;
   ammo_signed_at: string | null;
   cancel_reason: string;
+  fire_mode: FireMode;
   /** The commander's grade for the training as a whole, 0–100. */
   grade: number | null;
   grade_note: string;

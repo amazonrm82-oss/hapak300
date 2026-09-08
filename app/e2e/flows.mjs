@@ -251,6 +251,12 @@ try {
   await pickPerson('מפקד אימון', 'זזון');
   await pickPerson('מדריך', 'אבי מדריך');
 
+  const modeOptions = (await byLabel('סוג האימון').locator('option').allInnerTexts()).join(' | ');
+  check(
+    'אפשר לבחור אימון רטוב, חלקי או יבש',
+    modeOptions.includes('רטוב') && modeOptions.includes('חלקי') && modeOptions.includes('יבש'),
+  );
+
   check('הצעת הלוגיסטיקה מופיעה בטופס', await has('ציוד נדרש'));
   check('ובתוכה מזון ומים ותחמושת', (await has('מזון ומים')) && (await has('תחמושת')));
 
@@ -472,6 +478,14 @@ try {
   await page.locator('button:text-is("מגיע")').first().click();
   await settle(1800);
   check('ותשובתו נשמרת', !(await has('נקבע לך אימון')));
+
+  // and it is his answer once: changing it is his commander's to do
+  await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
+  await settle(1500);
+  check(
+    'ואין לו יותר כפתור לשנות אותה',
+    (await page.locator('button:has-text("עדכון נוכחות")').count()) === 0,
+  );
 
   await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
   await settle(1500);

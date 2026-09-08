@@ -72,18 +72,39 @@ insert into attendance (training_id, person_id, status, reason)
 values ((select id from trainings limit 1), me_id(), 'coming', '');
 select case when count(*)=1 then '✅' else '❌' end || '  12  לוחם מסמן נוכחות לעצמו' from attendance;
 
-do $t$ begin
-  update attendance set approved=true where person_id=me_id();
-  raise notice '❌  13  לוחם הצליח לאשר נוכחות של עצמו — כשל אבטחה';
-exception when others then
-  raise notice '✅  13  לוחם נחסם מלאשר נוכחות של עצמו';
+-- Refused two ways now: the policy hides the row from him, and the trigger
+-- raises. Both are refusals, so the test asks the only question that matters —
+-- whether the value moved.
+do $t$
+declare before_a boolean; after_a boolean;
+begin
+  select approved into before_a from attendance where person_id = me_id();
+  begin
+    update attendance set approved = true where person_id = me_id();
+  exception when others then null;
+  end;
+  select approved into after_a from attendance where person_id = me_id();
+  if after_a is distinct from before_a then
+    raise notice '❌  13  לוחם הצליח לאשר נוכחות של עצמו — כשל אבטחה';
+  else
+    raise notice '✅  13  לוחם נחסם מלאשר נוכחות של עצמו';
+  end if;
 end $t$;
 
-do $t$ begin
-  update attendance set rating=10 where person_id=me_id();
-  raise notice '❌  14  לוחם הצליח לדרג את עצמו — כשל אבטחה';
-exception when others then
-  raise notice '✅  14  לוחם נחסם מלדרג את עצמו';
+do $t$
+declare before_r int; after_r int;
+begin
+  select rating into before_r from attendance where person_id = me_id();
+  begin
+    update attendance set rating = 10 where person_id = me_id();
+  exception when others then null;
+  end;
+  select rating into after_r from attendance where person_id = me_id();
+  if after_r is distinct from before_r then
+    raise notice '❌  14  לוחם הצליח לדרג את עצמו — כשל אבטחה';
+  else
+    raise notice '✅  14  לוחם נחסם מלדרג את עצמו';
+  end if;
 end $t$;
 
 do $t$ begin
@@ -1079,5 +1100,77 @@ begin
     raise notice '✅  125  ואינו יכול לשנות אותו';
   end if;
 end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ תשובת נוכחות ניתנת פעם אחת ════════
+--
+-- הלוחם עונה לעצמו פעם אחת. אחרי זה השורה של המפקד: מספר שאפשר לתקן בשקט
+-- בערב שלפני אינו מספר שאפשר לתכנן לפיו.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$
+declare before_s text; after_s text;
+begin
+  select status into before_s from attendance
+   where person_id = me_id() and training_id = (select id from trainings limit 1);
+  begin
+    update attendance set status = 'absent', reason = 'התחרטתי'
+     where person_id = me_id() and training_id = (select id from trainings limit 1);
+  exception when others then null;
+  end;
+  select status into after_s from attendance
+   where person_id = me_id() and training_id = (select id from trainings limit 1);
+  if after_s is distinct from before_s then
+    raise notice '❌  126  לוחם שינה את תשובתו — כשל';
+  else
+    raise notice '✅  126  לוחם אינו משנה את תשובתו אחרי שענה';
+  end if;
+end $t$;
+
+-- והמפקד כן
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+set role authenticated;
+
+do $t$ begin
+  update attendance set status = 'late'
+   where training_id = (select id from trainings limit 1)
+     and person_id = (select id from people_view where name = 'דניאל כץ');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '✅  127  והמפקד כן משנה אותה';
+exception when others then
+  raise notice '❌  127  המפקד נחסם משינוי נוכחות — %', sqlerrm;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ יבש, רטוב או חלקי ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+select case when (select fire_mode from trainings limit 1) = 'wet'
+            then '✅' else '❌' end || '  128  אימון נוצר כרטוב כברירת מחדל';
+
+do $t$ begin
+  update trainings set fire_mode = 'dry' where id = (select id from trainings limit 1);
+  raise notice '✅  129  אפשר לסמן אימון כיבש';
+exception when others then
+  raise notice '❌  129  סימון אימון כיבש נכשל — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  update trainings set fire_mode = 'משהו' where id = (select id from trainings limit 1);
+  raise notice '❌  130  התקבל סוג אימון שאינו קיים — כשל';
+exception when others then
+  raise notice '✅  130  סוג אימון שאינו רטוב/חלקי/יבש נדחה';
+end $t$;
+
+select case when exists (select 1 from information_schema.columns
+                          where table_name = 'trainings_view' and column_name = 'fire_mode')
+            then '✅' else '❌' end || '  131  וסוג האימון מגיע למסך';
 
 reset role; reset request.jwt.claim.sub;

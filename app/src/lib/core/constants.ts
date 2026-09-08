@@ -1,4 +1,4 @@
-import type { AttStatus, CertType, Fitness, TrainingStatus } from './types';
+import type { AttStatus, CertType, FireMode, Fitness, TrainingStatus } from './types';
 
 /**
  * Every rank in the army, highest first — the order is also the seniority used
@@ -95,6 +95,7 @@ export const WEAPONS = [
   'רימוני רסס',
   'רימוני עשן',
   'סימונים / נורים',
+  'חק״ם',
 ] as const;
 
 /** Night-vision devices the unit holds. Free text is allowed — this is the shortcut. */
@@ -170,6 +171,26 @@ export const TRAINING_STATUS: Record<TrainingStatus, string> = {
   cancelled: 'בוטל',
   done: 'הסתיים',
 };
+
+/**
+ * How much of the day is live.
+ *
+ * The choice drives the ammunition: a dry day draws none and its stations carry
+ * no round allocation, a partial day draws only smoke and blanks, and a wet day
+ * draws what each station asks for.
+ */
+export const FIRE_MODES: { id: FireMode; label: string; note: string }[] = [
+  { id: 'wet', label: 'רטוב', note: 'ירי חי — כמות הכדורים לפי המקצים' },
+  { id: 'partial', label: 'חלקי', note: 'רימוני עשן וחק״ם בלבד' },
+  { id: 'dry', label: 'יבש', note: 'ללא תחמושת — מקצה ללא הקצאת כדורים' },
+];
+
+export const FIRE_MODE_LABEL: Record<FireMode, string> = Object.fromEntries(
+  FIRE_MODES.map((m) => [m.id, m.label]),
+) as Record<FireMode, string>;
+
+/** What a partial day is allowed to draw. */
+export const PARTIAL_AMMO = ['חק״ם', 'רימוני עשן', 'סימונים / נורים'] as const;
 
 export const FITNESS_OPTIONS: Fitness[] = ['כשיר', 'טעון בדיקה', 'מושבת'];
 

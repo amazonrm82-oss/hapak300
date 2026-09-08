@@ -88,7 +88,17 @@ with checks(sort, patch, what, ok) as (values
   (26, '05', 'מפקד צוות עורך את הצוות שלו',
    exists (select 1 from pg_policies
             where tablename = 'people' and policyname = 'people_update'
-              and qual like '%is_team_cmd%'))
+              and qual like '%is_team_cmd%')),
+  (27, '05', 'אמר״ל אישי וצ׳ שלו',
+   exists (select 1 from information_schema.columns
+            where table_name = 'people_view' and column_name = 'nvg_serial')),
+  (28, '05', 'סוג אימון — רטוב, חלקי או יבש',
+   exists (select 1 from information_schema.columns
+            where table_name = 'trainings_view' and column_name = 'fire_mode')),
+  (29, '05', 'תשובת נוכחות ניתנת פעם אחת',
+   exists (select 1 from pg_policies
+            where tablename = 'attendance' and policyname = 'attendance_update'
+              and qual not like '%me_id%'))
 )
 
 select
@@ -113,6 +123,10 @@ select case
    and to_regclass('public.training_guests') is not null
    and exists (select 1 from pg_trigger
                 where tgname = 'vehicles_driver_guard' and not tgisinternal)
+   and exists (select 1 from information_schema.columns
+                where table_name = 'people_view' and column_name = 'nvg_serial')
+   and exists (select 1 from information_schema.columns
+                where table_name = 'trainings_view' and column_name = 'fire_mode')
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

@@ -12,7 +12,7 @@ import { reminderPreview, weatherEstimate } from '@/lib/core/calendar';
 import { STATUS_LABEL, TRAINING_STATUS } from '@/lib/core/constants';
 import { dateLine, pad, relDays, sunTimes, weekOf } from '@/lib/core/dates';
 import { orderText } from '@/lib/core/exports';
-import { permsFor } from '@/lib/core/permissions';
+import { permsFor, canMarkAttendance } from '@/lib/core/permissions';
 import {
   attendanceStats,
   byId,
@@ -65,7 +65,8 @@ export default function MyTrainingPage() {
   const ps = participants(db, t);
   const mine = t.attendance[user.id];
   const isPart = ps.some((p) => p.id === user.id);
-  const canMark = isPart && t.status !== 'done' && t.status !== 'cancelled' && today <= t.date;
+  // once he has answered it is his commander's to change, not his
+  const canMark = isPart && canMarkAttendance(db, user, t, user.id, today);
   const alerts = perms.seesStats ? trainingAlerts(db, t, today, now) : [];
   const sun = sunTimes(t.date);
   const weather = weatherEstimate(t.date);

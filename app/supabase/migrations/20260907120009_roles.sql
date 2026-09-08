@@ -421,3 +421,41 @@ begin
 
   raise exception 'אין הרשאה לערוך לוחם אחר';
 end $$;
+
+-- ── תשובה אחת לכל לוחם ─────────────────────────────────────────────────────
+--
+-- A fighter answers for himself, once. After that the line is his commander's:
+-- a headcount that people can quietly revise the night before is not a number
+-- anyone can plan around. He may still create his first answer, and he may
+-- still be marked by his commander at any time — what he may no longer do is
+-- change his own answer after giving it.
+
+drop policy if exists attendance_update on attendance;
+create policy attendance_update on attendance for update to authenticated
+  using (can_approve_training(training_id) or is_training_cmd(training_id))
+  with check (can_approve_training(training_id) or is_training_cmd(training_id));
+
+-- ── יבש, רטוב או חלקי ──────────────────────────────────────────────────────
+--
+-- How much of the day is live decides what has to be drawn, signed for and
+-- returned. A dry day draws nothing; a partial day draws smoke and blanks; a
+-- wet day draws what the stations ask for. It is a property of the training, so
+-- the plan, the stations and the consumption report all read the same field.
+
+alter table trainings add column if not exists fire_mode text not null default 'wet';
+
+alter table trainings drop constraint if exists trainings_fire_mode_check;
+alter table trainings add constraint trainings_fire_mode_check
+  check (fire_mode in ('wet', 'partial', 'dry'));
+
+comment on column trainings.fire_mode is 'רטוב / חלקי / יבש — כמה מהיום הוא ירי חי';
+
+-- the client reads trainings through the view, and a view does not grow a
+-- column on its own
+drop view if exists trainings_view;
+create view trainings_view as
+select t.*, coalesce(s.seq, 0) as seq
+from trainings t left join trainings_seq s on s.id = t.id
+where me_id() is not null or auth.uid() is null;
+
+grant select on trainings_view to authenticated;

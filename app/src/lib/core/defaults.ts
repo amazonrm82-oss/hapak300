@@ -2,7 +2,7 @@ import { canDrive } from './alerts';
 import { DEPARTURE_LEAD_MINUTES, GEAR_CATALOG } from './constants';
 import { addDays, addMinutes, sundayOf } from './dates';
 import { topicSafety } from './selectors';
-import type { AmmoRow, Db, DayBlock, FoodRow, GearItem, Person, RotationConfig, TrainingTeam, Vehicle } from './types';
+import type { AmmoRow, Db, DayBlock, FireMode, FoodRow, GearItem, Person, RotationConfig, TrainingTeam, Vehicle } from './types';
 
 /** Per-topic kit list: [item, quantity]. Falls back to a small default set. */
 const GEAR_BY_TOPIC: Record<string, [string, number][]> = {
@@ -100,7 +100,12 @@ const ammoRow = (weapon: string, total: number, perFighter = 0): NewAmmo => ({
   used: 0,
 });
 
-export function defaultAmmo(topicId: string, n: number): NewAmmo[] {
+export function defaultAmmo(topicId: string, n: number, mode: FireMode = 'wet'): NewAmmo[] {
+  // A dry day draws nothing, and a partial day draws only what a partial day
+  // fires. Anything else is an allocation somebody has to sign for and return.
+  if (mode === 'dry') return [];
+  if (mode === 'partial')
+    return [ammoRow('חק״ם', 30 * n, 30), ammoRow('רימוני עשן', 6), ammoRow('סימונים / נורים', 6)];
   if (topicId === 'fire')
     return [
       ammoRow('M4 / תבור', 120 * n, 120),
@@ -199,6 +204,7 @@ export function defaultLogistics(
   location: string,
   attendsAll: string[] = [],
   date = '',
+  mode: FireMode = 'wet',
 ): DefaultLogistics {
   // סדיר joins whatever א׳ or ב׳ are doing, so they count towards the food,
   // the seats and the ammunition for every training
@@ -212,7 +218,7 @@ export function defaultLogistics(
   const atBase = /בסיס/.test(location || '');
   return {
     gear: defaultGear(topicId),
-    ammo: defaultAmmo(topicId, n),
+    ammo: defaultAmmo(topicId, n, mode),
     vehicles: defaultVehicles(teamId, start, people, attendsAll, date),
     food: defaultFood(topicId, n, atBase),
   };
