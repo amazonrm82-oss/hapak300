@@ -135,16 +135,33 @@ export function scheduleHTML(db: Db, trainings: TrainingFull[], weekOf: (iso: st
   );
 }
 
-/** Wraps an export body in a printable RTL document and opens the print dialog. */
+/**
+ * Wraps an export body in a printable RTL document and opens the print dialog.
+ *
+ * The document carries its own way back. On a phone — and above all in the
+ * installed app, which has no address bar and no back button — the print view
+ * filled the screen with no way out of it. The way back is a plain link rather
+ * than a button that closes the window, because this document inherits the
+ * app's Content-Security-Policy and would have its inline script blocked.
+ */
 export function printHTML(title: string, bodyHTML: string): boolean {
   const w = window.open('', '_blank');
   if (!w) return false;
+  const home = esc(window.location.href);
   w.document.write(
     `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>${title}</title>` +
+      `<meta name="viewport" content="width=device-width, initial-scale=1">` +
       `<style>body{font-family:system-ui,sans-serif;padding:24px;color:#111}h1{font-size:20px;margin:0 0 4px}` +
       `h2{font-size:15px;color:#555;margin:0 0 16px;font-weight:400}table{border-collapse:collapse;width:100%;font-size:13px}` +
       `th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f2f2f2}` +
-      `.muted{color:#666;font-size:12px;margin-top:18px}</style></head><body>${bodyHTML}` +
+      `.muted{color:#666;font-size:12px;margin-top:18px}` +
+      `.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;margin:-24px -24px 18px;padding:12px 16px;` +
+      `display:flex;align-items:center;gap:12px;font-size:14px}` +
+      `.bar a{color:#0a58ca;text-decoration:none;font-weight:600}` +
+      `@media print{.bar{display:none}body{padding:0}}</style></head><body>` +
+      `<div class="bar"><a href="${home}">חזרה למערכת</a>` +
+      `<span style="color:#666;font-size:12.5px">להדפסה חוזרת — תפריט השיתוף של הדפדפן</span></div>` +
+      `${bodyHTML}` +
       `<p class="muted">הופק מ-${esc(title)} · ${new Date().toLocaleString('he-IL')}</p></body></html>`,
   );
   w.document.close();

@@ -300,6 +300,26 @@ try {
     check(`${path} נטען`, !broke, broke ? 'הדף ריק או קרס' : '');
   }
 
+  // ── the print view has a way back out of it ──
+  //
+  // It opens as a bare document with no address bar and no back button of its
+  // own; in the installed app that left the schedule print as a dead end.
+  await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  const [printView] = await Promise.all([
+    page.context().waitForEvent('page'),
+    click('הדפסת לו״ז'),
+  ]);
+  await printView.waitForLoadState('domcontentloaded').catch(() => {});
+  await printView.waitForTimeout(800);
+  const printBody = await printView.locator('body').innerText();
+  check('מסך ההדפסה מציג את הלו״ז', printBody.includes('לו״ז אימונים'));
+  check('ויש בו קישור חזרה למערכת', printBody.includes('חזרה למערכת'));
+  await printView.locator('a:has-text("חזרה למערכת")').click();
+  await printView.waitForTimeout(1500);
+  check('שמחזיר לאפליקציה', printView.url().includes('/schedule'));
+  await printView.close();
+
   // ── the audit log recorded what happened ──
   await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
   await settle(1500);
