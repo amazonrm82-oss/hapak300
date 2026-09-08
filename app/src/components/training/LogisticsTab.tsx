@@ -33,7 +33,8 @@ export function LogisticsTab({ training: t }: { training: TrainingFull }) {
   if (!db || !user) return null;
 
   const perms = permsFor(db, user, t);
-  const canEdit = perms.canEdit && t.status !== 'cancelled';
+  // the רס״פ maintains the logistics of any training, alongside its commanders
+  const canEdit = perms.canLogistics && t.status !== 'cancelled';
   const ps = participants(db, t);
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {

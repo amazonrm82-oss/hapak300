@@ -903,6 +903,36 @@ export async function quickAddPerson(
   check(error);
 }
 
+/** Weapon, its serial and the certifications — the סמל צוות's part of a card. */
+export interface KitForm {
+  weapon: string;
+  weapon_serial: string;
+  certs: Record<string, string>;
+}
+
+/**
+ * Writes only those three columns.
+ *
+ * Deliberately not `savePerson`: that one sends the whole row, and a סמל צוות
+ * cannot see everyone's personal number — the form would carry a blank one and
+ * either wipe it or be refused outright. The database allows him these columns
+ * and nothing else, so this is what the screen sends.
+ */
+export async function saveKit(pid: string, form: KitForm): Promise<void> {
+  const certs = Object.fromEntries(
+    Object.entries(form.certs).filter(([, v]) => v && /^\d{4}-\d{2}-\d{2}$/.test(v)),
+  );
+  const { error } = await sb()
+    .from('people')
+    .update({
+      weapon: form.weapon.trim(),
+      weapon_serial: form.weapon_serial.trim(),
+      certs,
+    })
+    .eq('id', pid);
+  check(error);
+}
+
 export async function removePerson(pid: string): Promise<void> {
   const { error } = await sb().from('people').delete().eq('id', pid);
   check(error);

@@ -34,7 +34,7 @@ export function FleetCard() {
   if (!db || !user) return null;
 
   const perms = permsFor(db, user, null);
-  const canEdit = perms.isAdmin || user.is_team_commander;
+  const canEdit = perms.canCatalogs;
   const types = db.vehicle_types.length ? db.vehicle_types : ['האמר'];
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {

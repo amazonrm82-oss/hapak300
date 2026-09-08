@@ -228,7 +228,18 @@ async function readBody(req) {
 }
 
 const server = createServer(async (req, res) => {
-  if (req.method === 'OPTIONS') return json(res, 204);
+  // The preflight has to name the methods and headers it permits. Without the
+  // method list the browser refuses any PATCH before it is sent — which reads
+  // in the app as "Failed to fetch" and looks exactly like a broken save. Real
+  // Supabase answers this properly; the shim has to as well.
+  if (req.method === 'OPTIONS')
+    return json(res, 204, undefined, {
+      'access-control-allow-methods': 'GET, HEAD, POST, PATCH, PUT, DELETE, OPTIONS',
+      // echo what was asked for: a fixed list drops a header the client adds
+      // later, and `*` does not cover Authorization
+      'access-control-allow-headers': req.headers['access-control-request-headers'] ?? '*',
+      'access-control-max-age': '86400',
+    });
 
   const url = new URL(req.url, 'http://localhost');
   const path = url.pathname;

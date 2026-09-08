@@ -681,3 +681,163 @@ exception when others then
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ רס״פ וסמל צוות: תפקידים שנושאים הרשאה ════════
+--
+-- שני התפקידים האלה מקבלים הרשאה מהתפקיד עצמו ולא מסימון הרשאות. הבדיקות
+-- כאן הן על מה שמותר להם — וחשוב מזה, על מה שלא: הרשאה שנפתחה יותר מדי
+-- נראית בדיוק כמו הרשאה שעובדת, עד היום שבו מישהו משנה מה שאסור לו.
+reset role; reset request.jwt.claim.sub;
+insert into auth.users (id) values
+  ('aaaaaaaa-0000-0000-0000-00000000000a'),
+  ('bbbbbbbb-0000-0000-0000-00000000000b');
+
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+insert into people (team_id, rank, name, role, pn, phone, rating) values
+  ('b','רס״ל','משה רסף','רס״פ','7000010','052-6000000',7),
+  ('a','סמל','יוסי סמל','סמל צוות','7000011','052-6000001',7);
+reset role; reset request.jwt.claim.sub;
+
+update people set auth_id='aaaaaaaa-0000-0000-0000-00000000000a' where pn='7000010';
+update people set auth_id='bbbbbbbb-0000-0000-0000-00000000000b' where pn='7000011';
+
+-- ── הרס״פ: ציוד ורכבים ──
+set request.jwt.claim.sub = 'aaaaaaaa-0000-0000-0000-00000000000a';
+set role authenticated;
+
+do $t$ begin
+  insert into fleet (type, tz, seats) values ('RZR', '9900123', 4);
+  raise notice '✅  94  רס״פ מוסיף רכב למאגר';
+exception when others then
+  raise notice '❌  94  רס״פ נחסם מהוספת רכב — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  insert into vehicle_types (name) values ('רכב בדיקה של הרס״פ');
+  raise notice '✅  95  רס״פ מעדכן את קטלוג סוגי הרכב';
+exception when others then
+  raise notice '❌  95  רס״פ נחסם מעדכון הקטלוג — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  insert into gear_items (training_id, name, qty, sort)
+  values ((select id from trainings limit 1), 'אלונקה', 2, 99);
+  raise notice '✅  96  רס״פ מעדכן ציוד של אימון';
+exception when others then
+  raise notice '❌  96  רס״פ נחסם מעדכון ציוד — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  insert into ammo (training_id, weapon, per_fighter, allocated, sort)
+  values ((select id from trainings limit 1), 'M4 / תבור', 60, 600, 99);
+  raise notice '✅  97  רס״פ מעדכן תחמושת של אימון';
+exception when others then
+  raise notice '❌  97  רס״פ נחסם מעדכון תחמושת — %', sqlerrm;
+end $t$;
+
+-- ומה שאינו שלו
+do $t$ begin
+  insert into day_blocks (training_id, time, title, sort)
+  values ((select id from trainings limit 1), '09:00', 'תרגיל של הרס״פ', 99);
+  raise notice '❌  98  רס״פ שינה את מהלך היום — כשל אבטחה';
+exception when others then
+  raise notice '✅  98  רס״פ נחסם משינוי מהלך היום';
+end $t$;
+
+-- Two ways a write can be refused: the policy hides the row, so nothing is
+-- updated, or the trigger raises. Both are correct refusals, and a test that
+-- accepts only one of them is testing the mechanism instead of the rule — so
+-- this checks the only thing that matters, that the value did not change.
+do $t$
+declare before_w text; after_w text;
+begin
+  select weapon into before_w from people_view where name = 'דניאל כץ';
+  begin
+    update people set weapon = 'נגב'
+    where id = (select id from people_view where name = 'דניאל כץ');
+  exception when others then null;
+  end;
+  select weapon into after_w from people_view where name = 'דניאל כץ';
+  if after_w is distinct from before_w then
+    raise notice '❌  99  רס״פ ערך נשק של לוחם — כשל אבטחה';
+  else
+    raise notice '✅  99  רס״פ נחסם מעריכת פרטי לוחם';
+  end if;
+end $t$;
+
+-- ── סמל הצוות: נשק, מספר נשק והכשרות ──
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = 'bbbbbbbb-0000-0000-0000-00000000000b';
+set role authenticated;
+
+do $t$ begin
+  update people set weapon = 'נגב', weapon_serial = '5512345'
+  where id = (select id from people_view where name = 'דניאל כץ');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '✅  100  סמל צוות מעדכן נשק ומספר נשק';
+exception when others then
+  raise notice '❌  100  סמל צוות נחסם מעדכון נשק — %', sqlerrm;
+end $t$;
+
+do $t$ begin
+  update people set certs = jsonb_build_object('rifle', '2027-01-01')
+  where id = (select id from people_view where name = 'דניאל כץ');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '✅  101  סמל צוות מעדכן הכשרות';
+exception when others then
+  raise notice '❌  101  סמל צוות נחסם מעדכון הכשרות — %', sqlerrm;
+end $t$;
+
+select case when (select weapon_serial from people_view where name = 'דניאל כץ') = '5512345'
+            then '✅' else '❌' end || '  102  ורואה את מספר הנשק שרשם';
+
+do $t$ begin
+  update people set name = 'שם אחר'
+  where id = (select id from people_view where name = 'דניאל כץ');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  103  סמל צוות שינה שם של לוחם — כשל אבטחה';
+exception when others then
+  if sqlerrm = 'no rows' then raise notice '❌   103  סמל צוות נחסם משינוי שאר הפרטים — לא עודכנה אף שורה, הבדיקה לא בדקה כלום';
+  else raise notice '✅  103  סמל צוות נחסם משינוי שאר הפרטים'; end if;
+end $t$;
+
+do $t$ begin
+  update people set is_admin = true where id = me_id();
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  104  סמל צוות מינה את עצמו למנהל — כשל אבטחה';
+exception when others then
+  if sqlerrm = 'no rows' then raise notice '❌   104  סמל צוות נחסם ממינוי עצמי — לא עודכנה אף שורה, הבדיקה לא בדקה כלום';
+  else raise notice '✅  104  סמל צוות נחסם ממינוי עצמי'; end if;
+end $t$;
+
+do $t$ begin
+  insert into fleet (type, tz, seats) values ('האמר', '9900999', 5);
+  raise notice '❌  105  סמל צוות ערך את מאגר הרכבים — כשל אבטחה';
+exception when others then
+  raise notice '✅  105  סמל צוות נחסם ממאגר הרכבים';
+end $t$;
+
+-- ── ולוחם רגיל עדיין לא ──
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$
+declare before_w text; after_w text;
+begin
+  select weapon into before_w from people_view where name = 'איתי רוזן';
+  begin
+    update people set weapon = 'אקדח'
+    where id = (select id from people_view where name = 'איתי רוזן');
+  exception when others then null;
+  end;
+  select weapon into after_w from people_view where name = 'איתי רוזן';
+  if after_w is distinct from before_w then
+    raise notice '❌  106  לוחם רגיל ערך נשק של אחר — כשל אבטחה';
+  else
+    raise notice '✅  106  לוחם רגיל נחסם מעריכת נשק של אחר';
+  end if;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

@@ -178,6 +178,14 @@ try {
   await click('הוסף');
   await settle(1500);
 
+  // a סמל צוות, whose rights come from the post rather than a permission box
+  await byLabel('שם מלא').fill('שי סמל');
+  await byLabel('מספר אישי').fill('7654324');
+  await byLabel('תפקיד').selectOption('סמל צוות');
+  await byLabel('צוות').selectOption('a');
+  await click('הוסף');
+  await settle(1500);
+
   // ── creating a training with logistics ──
   // the create button lives on the schedule, next to the week it would fall in
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
@@ -387,6 +395,47 @@ try {
     const editable = await drillTable.locator('input:not([disabled])').count();
     check('ואינו יכול לשנות תוצאות', editable === 0);
   }
+
+  // ── and the סמל צוות, whose rights come from his post ──
+  await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+  await settle();
+  await click('יציאה');
+  await settle(1200);
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.fill('input', '7654324');
+  await click('המשך');
+  await settle(900);
+  const sgtPins = page.locator('input[type="password"]');
+  await sgtPins.nth(0).fill('4739');
+  if ((await sgtPins.count()) > 1) await sgtPins.nth(1).fill('4739');
+  await click('שמור קוד');
+  await page.waitForURL(/\/(schedule|my)/, { timeout: 15000 }).catch(() => {});
+  await settle(1500);
+  check('סמל צוות נכנס למערכת', !page.url().includes('/login'));
+
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1500);
+  check('ואין לו כפתור עריכה מלאה', (await page.locator('button:has-text("עריכה")').count()) === 0);
+  const kitButtons = page.locator('button:has-text("נשק והכשרות")');
+  check('אלא רק נשק והכשרות', (await kitButtons.count()) > 0);
+
+  await kitButtons.first().click();
+  await settle(900);
+  await page.locator('input[placeholder="הצ׳ של הנשק"]').fill('5512345');
+  await click('שמירה');
+  await settle(2000);
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1500);
+  await kitButtons.first().click();
+  await settle(900);
+  const savedSerial = await page.locator('input[placeholder="הצ׳ של הנשק"]').inputValue();
+  check('ומספר הנשק שרשם נשמר וחזר', savedSerial === '5512345');
+  await page.locator('button[aria-label="סגירה"], button:has-text("✕")').first().click();
+  await settle(600);
+
+  await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  check('ואינו יוצר אימונים', (await page.locator('button:has-text("אימון חדש")').count()) === 0);
 
   const badResponses = failedRequests.filter((r) => !/favicon|manifest|sw\.js/.test(r));
   check('אין שגיאות בקונסולה בכל המסכים',

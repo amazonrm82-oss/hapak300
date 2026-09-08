@@ -85,6 +85,17 @@ export const ROLES = [
 ] as const;
 export const ESSENTIAL_ROLES = ['חובש', 'נהג', 'מאבטח'] as const;
 
+/**
+ * The two posts that carry rights of their own, named once so the screens and
+ * the database policies cannot drift apart on a spelling.
+ *
+ * The רס״פ runs the unit's equipment: the fleet, the catalogs and the logistics
+ * of any training. The סמל צוות keeps the personal kit straight — weapon, its
+ * serial and the certifications — on anyone's card, and nothing else.
+ */
+export const ROLE_RASAP = 'רס״פ';
+export const ROLE_SERGEANT = 'סמל צוות';
+
 export const WEAPONS = [
   'M4 / תבור',
   'נגב',

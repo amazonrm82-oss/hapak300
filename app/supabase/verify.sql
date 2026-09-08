@@ -5,7 +5,7 @@
 -- מדביקים ב-SQL Editor של Supabase ולוחצים Run.
 --
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
--- patch-01 → patch-02 → patch-03a → patch-03b → patch-04
+-- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05
 -- ═══════════════════════════════════════════════════════════════════════════
 
 with checks(sort, patch, what, ok) as (values
@@ -63,7 +63,20 @@ with checks(sort, patch, what, ok) as (values
   -- אבל לא מגיע למסך, כי המסך קורא מהתצוגה ולא מהטבלה
   (19, '04', 'וציון המפקד מגיע למסך (התצוגה נבנתה מחדש)',
    exists (select 1 from information_schema.columns
-            where table_name = 'trainings_view' and column_name = 'grade'))
+            where table_name = 'trainings_view' and column_name = 'grade')),
+
+  -- ── patch-05 ──
+  (20, '05', 'רס״פ מנהל ציוד ורכבים',
+   to_regprocedure('public.is_rasap()') is not null),
+  (21, '05', 'סמל צוות מעדכן נשק והכשרות',
+   to_regprocedure('public.is_sergeant()') is not null),
+  (22, '05', 'והרס״פ באמת רשאי לגעת במאגר הרכבים',
+   exists (select 1 from pg_policies
+            where tablename = 'fleet' and policyname = 'fleet_write'
+              and qual like '%is_rasap%')),
+  (23, '05', 'וסמל הצוות רואה את מספר הנשק שהוא רושם',
+   exists (select 1 from pg_views
+            where viewname = 'people_view' and definition like '%is_sergeant%'))
 )
 
 select
@@ -81,6 +94,10 @@ select case
    and to_regclass('public.drill_results') is not null
    and to_regclass('public.periods') is not null
    and to_regclass('public.fleet') is not null
+   and to_regprocedure('public.is_sergeant()') is not null
+   and (select count(*) from pg_policies
+         where tablename = 'fleet' and policyname = 'fleet_write'
+           and qual like '%is_rasap%') = 1
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

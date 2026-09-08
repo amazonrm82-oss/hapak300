@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { KitDialog } from '@/components/dialogs/KitDialog';
 import { PersonDialog } from '@/components/dialogs/PersonDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
@@ -17,6 +18,8 @@ import { useApp } from '@/lib/data/provider';
 export default function TeamsPage() {
   const { db, user, today, toast, refresh } = useApp();
   const [editing, setEditing] = useState<Person | null | undefined>(undefined); // undefined = closed
+  // the סמל צוות edits weapon, serial and certifications only, in a form of its own
+  const [editingKit, setEditingKit] = useState<Person | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [qa, setQa] = useState({
     name: '',
@@ -319,9 +322,13 @@ export default function TeamsPage() {
                             {pr}
                           </span>
                         )}
-                        {perms.canManagePeople && (
-                          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditing(p)}>
-                            עריכה
+                        {(perms.canManagePeople || perms.canEditKit) && (
+                          <button
+                            className="btn btn-ghost"
+                            style={{ fontSize: 12 }}
+                            onClick={() => (perms.canManagePeople ? setEditing(p) : setEditingKit(p))}
+                          >
+                            {perms.canManagePeople ? 'עריכה' : 'נשק והכשרות'}
                           </button>
                         )}
                       </div>
@@ -343,15 +350,25 @@ export default function TeamsPage() {
                 <span style={{ fontSize: 13 }}>{fullName(p)}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>{roleLabel(db, p)}</span>
               </span>
-              {perms.canManagePeople && (
-                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditing(p)}>
-                  עריכה
+              {(perms.canManagePeople || perms.canEditKit) && (
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12 }}
+                  onClick={() => (perms.canManagePeople ? setEditing(p) : setEditingKit(p))}
+                >
+                  {perms.canManagePeople ? 'עריכה' : 'נשק והכשרות'}
                 </button>
               )}
             </div>
           ))}
         </div>
       </SectionCard>
+
+      <KitDialog
+        open={!!editingKit}
+        person={editingKit}
+        onClose={() => setEditingKit(null)}
+      />
 
       <PersonDialog
         open={editing !== undefined}

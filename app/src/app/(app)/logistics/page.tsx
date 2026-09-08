@@ -19,7 +19,7 @@ export default function LogisticsPage() {
   if (!db || !user) return null;
 
   const perms = permsFor(db, user, null);
-  const canCat = perms.isAdmin || user.is_team_commander;
+  const canCat = perms.canCatalogs;
   const rows = activeTrainings(db);
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {

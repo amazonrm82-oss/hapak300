@@ -1,3 +1,4 @@
+import { ROLE_RASAP, ROLE_SERGEANT } from './constants';
 import type { Db, Person, Training } from './types';
 
 /**
@@ -30,6 +31,14 @@ export interface Perms {
   seesList: boolean;
   canPin: boolean;
   canSignAmmo: boolean;
+  isRasap: boolean;
+  isSergeant: boolean;
+  /** The logistics of a training: gear, vehicles, ammunition, food. */
+  canLogistics: boolean;
+  /** The standing lists behind them: the fleet, the catalogs. */
+  canCatalogs: boolean;
+  /** Weapon, weapon serial and certifications on anyone's card — and nothing else. */
+  canEditKit: boolean;
 }
 
 // `_db` is kept in the signature so every call site reads the same as the
@@ -45,6 +54,8 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
   const isTrainCmd = !!(t && user && t.commander_id === user.id);
   const isInstr = !!(t && user && t.instructor_id === user.id);
   const isAnyTeamCmd = !!(user && user.is_team_commander);
+  const isRasap = user?.role === ROLE_RASAP;
+  const isSergeant = user?.role === ROLE_SERGEANT;
 
   return {
     isAdmin,
@@ -72,6 +83,11 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
     seesList: isAdmin || isAnyTeamCmd || isTrainCmd || isInstr,
     canPin: isAdmin || isTeamCmd || isTrainCmd,
     canSignAmmo: isAdmin || isTrainCmd,
+    isRasap,
+    isSergeant,
+    canLogistics: isAdmin || isTeamCmd || isTrainCmd || isInstr || isRasap,
+    canCatalogs: isAdmin || isAnyTeamCmd || isRasap,
+    canEditKit: isAdmin || isSergeant,
   };
 }
 
