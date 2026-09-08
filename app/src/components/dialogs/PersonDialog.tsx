@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
 import { CERT_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
-import { canEditPerson, permsFor } from '@/lib/core/permissions';
+import { canEditPerson, canGrantRights, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
 import { removePerson, resetPin, revokeSessions, savePerson, type PersonForm } from '@/lib/data/mutations';
@@ -82,6 +82,9 @@ export function PersonDialog({ open, person, onClose }: Props) {
   const perms = permsFor(db, user, null);
   // an HQ-party commander may not act on an administrator — the rank above them
   const locked = !!person && !canEditPerson(user, person);
+  // a team commander edits his team's cards in full, but appoints nobody: the
+  // four rights below are what would put someone alongside or above him
+  const canRights = canGrantRights(user);
   const set =
     <K extends keyof PersonForm>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -305,16 +308,25 @@ export function PersonDialog({ open, person, onClose }: Props) {
           <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
             סוג משתמש והרשאות — ללא סימון: לוחם (רואה לו״ז, מסמן נוכחות לעצמו)
           </span>
-          <Check
-            checked={f.is_team_commander}
-            onChange={set('is_team_commander')}
-            label="מפקד צוות — מאשר נוכחות סופית, יוצר אימונים ומזמין מדריכים (מחליף את מפקד הצוות הנוכחי)"
-          />
-          <Check
-            checked={f.is_instructor}
-            onChange={set('is_instructor')}
-            label="מדריך — ניתן להזמין להדרכה (הסמכות לפי נושא למטה)"
-          />
+          {!canRights && (
+            <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
+              מינוי מפקד צוות, מדריך, מפקד חפ״ק ומנהל מערכת שמור למפקד החפ״ק ולמנהל המערכת.
+            </span>
+          )}
+          {canRights && (
+            <Check
+              checked={f.is_team_commander}
+              onChange={set('is_team_commander')}
+              label="מפקד צוות — מאשר נוכחות סופית, יוצר אימונים ומזמין מדריכים (מחליף את מפקד הצוות הנוכחי)"
+            />
+          )}
+          {canRights && (
+            <Check
+              checked={f.is_instructor}
+              onChange={set('is_instructor')}
+              label="מדריך — ניתן להזמין להדרכה (הסמכות לפי נושא למטה)"
+            />
+          )}
           {perms.canGrantRoles && (
             <>
               <Check
@@ -337,7 +349,10 @@ export function PersonDialog({ open, person, onClose }: Props) {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+          hidden={!canRights}
+        >
           <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
             הסמכות הדרכה (סימון נושא הופך אותו למדריך מוסמך)
           </span>

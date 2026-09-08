@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { LogisticsEditor, type LogisticsDraft } from '@/components/dialogs/LogisticsEditor';
 import { Field } from '@/components/ui/bits';
-import { DEFAULT_FREQ, DEFAULT_PICKUP } from '@/lib/core/constants';
-import { addDays, weekStart } from '@/lib/core/dates';
+import { DEFAULT_FREQ, DEFAULT_PICKUP, DEPARTURE_LEAD_MINUTES } from '@/lib/core/constants';
+import { addDays, addMinutes, weekStart } from '@/lib/core/dates';
 import { defaultLogistics } from '@/lib/core/defaults';
 import { roleLabel } from '@/lib/core/permissions';
 import { fullName, topicName, topicSafety } from '@/lib/core/selectors';
@@ -34,6 +34,7 @@ const blank = (topicId: string, safety: string, date: string): TrainingForm => (
   instructor_id: '',
   freq: DEFAULT_FREQ,
   pickup: DEFAULT_PICKUP,
+  departure: '',
   safety,
   notes: '',
 });
@@ -58,6 +59,10 @@ const proposeLogistics = (
       .map((t) => t.id),
     date,
   );
+
+/** What the gathering time would be if nobody sets one. */
+const suggestedDeparture = (start: string): string =>
+  /^([01]\d|2[0-3]):[0-5]\d$/.test(start) ? addMinutes(start, -DEPARTURE_LEAD_MINUTES) : '';
 
 /** Every field the unit made mandatory before a training may be published. */
 export function TrainingFormDialog({ open, training, week = 1, onClose }: Props) {
@@ -86,6 +91,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         instructor_id: training.instructor_id ?? '',
         freq: training.freq,
         pickup: training.pickup,
+        departure: training.departure,
         safety: training.safety,
         notes: training.notes,
       });
@@ -280,8 +286,20 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
           <input className="input" value={f.freq} onChange={set('freq')} />
         </Field>
 
-        <Field label="נקודת איסוף">
+        <Field label="נקודת התכנסות">
           <input className="input" value={f.pickup} onChange={set('pickup')} />
+        </Field>
+
+        <Field label="שעת התכנסות בנקודה">
+          <input
+            className="input tabnum"
+            type="time"
+            value={f.departure || suggestedDeparture(f.start)}
+            onChange={set('departure')}
+          />
+          <span style={{ fontSize: 11, color: 'var(--color-neutral-500)' }}>
+            ברירת המחדל שעה וחצי לפני תחילת האימון · שעת היציאה של הרכבים מתעדכנת יחד איתה
+          </span>
         </Field>
 
         <Field label="הוראות בטיחות (תבנית לפי נושא — ניתן לערוך)" style={{ gridColumn: 'span 2' }}>

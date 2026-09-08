@@ -260,3 +260,75 @@ language sql stable security definer set search_path = public as $$
     select 1 from training_guests g where g.training_id = tid and g.person_id = me_id()
   )
 $$;
+
+-- ── מפקד צוות עורך את הצוות שלו ────────────────────────────────────────────
+--
+-- A team commander runs his team's cards in full: name, rank, post, phone,
+-- weapon, medical profile, certifications — everything a card holds. What he
+-- may not do is appoint: making someone a team commander, an instructor, an HQ
+-- commander or an administrator would put a person alongside or above him, and
+-- that is a decision for the level above.
+--
+-- The list here is of what he may NOT touch, not of what he may. For the סמל
+-- צוות the opposite is right — he may touch three things and nothing else — but
+-- "edits the card in full" has to keep meaning that when a column is added, or
+-- the rule would quietly narrow every time the schema grows.
+
+drop policy if exists people_update on people;
+create policy people_update on people for update to authenticated
+  using (
+    is_admin() or id = me_id() or is_sergeant()
+    or (is_team_cmd() and team_id is not distinct from my_team())
+  )
+  with check (
+    is_admin() or id = me_id() or is_sergeant()
+    or (is_team_cmd() and team_id is not distinct from my_team())
+  );
+
+create or replace function guard_people_self_edit() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  own     text[] := array['notif', 'updated_at'];
+  kit     text[] := array['weapon', 'weapon_serial', 'certs', 'updated_at'];
+  -- the four appointments, plus the account internals nobody edits by hand
+  no_touch text[] := array[
+    'is_team_commander', 'is_instructor', 'is_hapak_commander', 'is_admin',
+    'qual', 'auth_id', 'pin_hash', 'pin_set_at', 'sessions_valid_from'
+  ];
+  col text;
+begin
+  -- no end-user JWT: the server acting for itself (the login routes write
+  -- `pin_hash` and `auth_id` with the service key, which carries no token)
+  if auth.uid() is null then return new; end if;
+  if is_admin() then return new; end if;
+
+  if new.id = me_id() and not is_team_cmd() then
+    -- a סמל צוות keeps his own kit too, like everyone else's
+    if is_sergeant() then own := own || kit; end if;
+    if (to_jsonb(new) - own) is distinct from (to_jsonb(old) - own) then
+      raise exception 'רק מנהל מערכת או מפקד החפ״ק יכולים לשנות פרטים, הרשאות והסמכות';
+    end if;
+    return new;
+  end if;
+
+  -- a team commander's own card is one of his team's cards: he keeps it like
+  -- the rest of them, and the same list of appointments stays out of his hands
+  if is_team_cmd()
+     and (new.id = me_id() or old.team_id is not distinct from my_team()) then
+    foreach col in array no_touch loop
+      if to_jsonb(new)->col is distinct from to_jsonb(old)->col then
+        raise exception 'מפקד צוות אינו ממנה מפקד צוות, מדריך, מפקד חפ״ק או מנהל מערכת';
+      end if;
+    end loop;
+    return new;
+  end if;
+
+  if is_sergeant() then
+    if (to_jsonb(new) - kit) is distinct from (to_jsonb(old) - kit) then
+      raise exception 'סמל צוות רשאי לעדכן נשק, מספר נשק והכשרות בלבד';
+    end if;
+    return new;
+  end if;
+
+  raise exception 'אין הרשאה לערוך לוחם אחר';
+end $$;

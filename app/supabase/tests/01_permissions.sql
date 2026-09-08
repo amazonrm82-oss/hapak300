@@ -930,3 +930,108 @@ begin
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ מפקד צוות עורך את הצוות שלו ════════
+--
+-- ״באופן מלא״ צריך להישאר מלא גם כשמוסיפים עמודה, ולכן הכלל בבסיס הנתונים
+-- מונה את מה שאסור ולא את מה שמותר. מה שאסור הוא מינוי.
+--
+-- מפקד צוות חדש ונקי: יואב ברק כבר קודם למנהל מערכת בבדיקות שלמעלה, ובדיקה
+-- שרצה בשם מנהל מערכת לא בודקת דבר על מפקד צוות.
+reset role; reset request.jwt.claim.sub;
+insert into auth.users (id) values ('cccccccc-0000-0000-0000-00000000000c');
+
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+insert into people (team_id, rank, name, role, pn, phone, rating, is_team_commander)
+values ('b','סרן','ניר מפקד','מפקד צוות','7000020','052-7000000',8,true);
+reset role; reset request.jwt.claim.sub;
+update people set auth_id='cccccccc-0000-0000-0000-00000000000c' where pn='7000020';
+
+set request.jwt.claim.sub = 'cccccccc-0000-0000-0000-00000000000c';
+set role authenticated;
+
+do $t$ begin
+  update people set phone = '052-9999999', role = 'קשר', rank = 'סמ״ר'
+  where id = (select id from people_view where name = 'משה רסף');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '✅  113  מפקד צוות עורך פרטים של לוחם בצוות שלו';
+exception when others then
+  raise notice '❌  113  מפקד צוות נחסם מעריכת הצוות שלו — %', sqlerrm;
+end $t$;
+
+select case when (select phone from people_view where name = 'משה רסף') = '052-9999999'
+            then '✅' else '❌' end || '  114  והשינוי נשמר';
+
+do $t$ begin
+  update people set weapon = 'מא״ג', medical_profile = 97, limitations = 'ללא'
+  where id = (select id from people_view where name = 'משה רסף');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '✅  115  וגם נשק, פרופיל רפואי ומגבלות';
+exception when others then
+  raise notice '❌  115  נחסם מעריכת נשק ופרופיל — %', sqlerrm;
+end $t$;
+
+-- ומה שאסור: מינוי
+do $t$ begin
+  update people set is_team_commander = true
+  where id = (select id from people_view where name = 'משה רסף');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  116  מפקד צוות מינה מפקד צוות — כשל אבטחה';
+exception when others then
+  raise notice '✅  116  מפקד צוות נחסם ממינוי מפקד צוות';
+end $t$;
+
+do $t$ begin
+  update people set is_instructor = true
+  where id = (select id from people_view where name = 'משה רסף');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  117  מפקד צוות מינה מדריך — כשל אבטחה';
+exception when others then
+  raise notice '✅  117  מפקד צוות נחסם ממינוי מדריך';
+end $t$;
+
+do $t$ begin
+  update people set qual = array['fire']
+  where id = (select id from people_view where name = 'משה רסף');
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  118  מפקד צוות נתן הסמכת הדרכה — כשל אבטחה';
+exception when others then
+  raise notice '✅  118  ואף לא הסמכת הדרכה, שהופכת ממילא למדריך';
+end $t$;
+
+do $t$ begin
+  update people set is_hapak_commander = true where id = me_id();
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  119  מפקד צוות מינה את עצמו למפקד חפ״ק — כשל אבטחה';
+exception when others then
+  raise notice '✅  119  מפקד צוות נחסם ממינוי עצמי למפקד חפ״ק';
+end $t$;
+
+do $t$ begin
+  update people set is_admin = true where id = me_id();
+  if not found then raise exception 'no rows'; end if;
+  raise notice '❌  120  מפקד צוות מינה את עצמו למנהל מערכת — כשל אבטחה';
+exception when others then
+  raise notice '✅  120  מפקד צוות נחסם ממינוי עצמי למנהל מערכת';
+end $t$;
+
+-- ולא לוחם של צוות אחר
+do $t$
+declare before_p text; after_p text;
+begin
+  select phone into before_p from people_view where name = 'איתי רוזן';
+  begin
+    update people set phone = '052-0000000'
+    where id = (select id from people_view where name = 'איתי רוזן');
+  exception when others then null;
+  end;
+  select phone into after_p from people_view where name = 'איתי רוזן';
+  if after_p is distinct from before_p then
+    raise notice '❌  121  מפקד צוות ערך לוחם של צוות אחר — כשל אבטחה';
+  else
+    raise notice '✅  121  מפקד צוות נחסם מעריכת לוחם של צוות אחר';
+  end if;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

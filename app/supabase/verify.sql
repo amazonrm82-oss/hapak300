@@ -81,7 +81,11 @@ with checks(sort, patch, what, ok) as (values
    exists (select 1 from pg_trigger
             where tgname = 'vehicles_driver_guard' and not tgisinternal)),
   (25, '05', 'השלמות ושיבוץ לאימון של צוות אחר',
-   to_regclass('public.training_guests') is not null)
+   to_regclass('public.training_guests') is not null),
+  (26, '05', 'מפקד צוות עורך את הצוות שלו',
+   exists (select 1 from pg_policies
+            where tablename = 'people' and policyname = 'people_update'
+              and qual like '%is_team_cmd%'))
 )
 
 select

@@ -344,6 +344,20 @@ try {
     check(`${path} נטען`, !broke, broke ? 'הדף ריק או קרס' : '');
   }
 
+  // ── promote the officer to team commander, for the checks further down ──
+  // Done while the administrator is still signed in, and after the checks above
+  // that depend on him holding no command post. He is the senior rank in צוות
+  // א׳, so his is the first card on the roster.
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  await click('עריכה');
+  await settle(900);
+  // the name lives in an input, so it is read as a value rather than as text
+  check('כרטיס הלוחם נפתח לעריכה', (await inDialog('שם מלא').inputValue()) === 'רון קצין');
+  await page.locator('label:has-text("מאשר נוכחות סופית") input[type="checkbox"]').check();
+  await click('שמירה');
+  await settle(1800);
+
   // ── the print view has a way back out of it ──
   //
   // It opens as a bare document with no address bar and no back button of its
@@ -482,6 +496,47 @@ try {
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
   await settle(1200);
   check('ואינו יוצר אימונים', (await page.locator('button:has-text("אימון חדש")').count()) === 0);
+
+  // ── and the team commander, over his own team ──
+  await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+  await settle();
+  await click('יציאה');
+  await settle(1200);
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.fill('input', '7654323');
+  await click('המשך');
+  await settle(900);
+  const cmdPins = page.locator('input[type="password"]');
+  await cmdPins.nth(0).fill('6284');
+  if ((await cmdPins.count()) > 1) await cmdPins.nth(1).fill('6284');
+  await click('שמור קוד');
+  await page.waitForURL(/\/(schedule|my)/, { timeout: 15000 }).catch(() => {});
+  await settle(1500);
+  if (await has('נקבע לך אימון')) {
+    await page.locator('button:text-is("מגיע")').first().click();
+    await settle(1500);
+  }
+  check('מפקד צוות נכנס למערכת', !page.url().includes('/login'));
+
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1500);
+  check('ורואה עריכה מלאה על הצוות שלו', (await page.locator('button:has-text("עריכה")').count()) > 0);
+
+  await click('עריכה');
+  await settle(1000);
+  const card = page.locator('[role="dialog"]');
+  const cardText = await card.innerText();
+  check(
+    'אך אינו יכול למנות מפקד צוות או מדריך',
+    !cardText.includes('מאשר נוכחות סופית') && !cardText.includes('ניתן להזמין להדרכה'),
+  );
+  check('ונאמר לו במפורש למה', cardText.includes('שמור למפקד החפ״ק ולמנהל המערכת'));
+
+  // and the editing itself works
+  await inDialog('טלפון').fill('052-7654321');
+  await click('שמירה');
+  await settle(1800);
+  check('והעריכה עצמה נשמרת', await has('052-7654321'));
 
   const badResponses = failedRequests.filter((r) => !/favicon|manifest|sw\.js/.test(r));
   check('אין שגיאות בקונסולה בכל המסכים',

@@ -176,6 +176,8 @@ export interface TrainingForm {
   instructor_id: string;
   freq: string;
   pickup: string;
+  /** When the force gathers at the pickup point. Blank falls back to 90 minutes before the start. */
+  departure: string;
   safety: string;
   notes: string;
   /** Filled in on the create form; when absent the topic defaults are used. */
@@ -191,6 +193,8 @@ export function validateTrainingForm(f: TrainingForm): string | null {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(f.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.end))
     return 'שעות לא תקינות (HH:MM)';
   if (!f.location.trim()) return 'נדרש מיקום';
+  if (f.departure && !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.departure))
+    return 'שעת התכנסות לא תקינה (HH:MM)';
   if (!f.commander_id || !f.instructor_id) return 'נדרשים מפקד אימון ומדריך';
   if (!f.safety.trim()) return 'נדרשות הוראות בטיחות';
   return null;
@@ -212,12 +216,16 @@ function draftFor(db: Db, o: {
   pickup?: string;
   notes?: string;
   status?: 'planned' | 'published';
+  departure?: string;
   gear?: NewGear[];
   vehicles?: NewVehicle[];
   ammo?: NewAmmo[];
   food?: NewFood[];
 }) {
-  const departure = addMinutes(o.start, -DEPARTURE_LEAD_MINUTES);
+  // The gathering time is the commander's to set — a force that meets at the
+  // armoury needs longer than one that meets at the gate. Ninety minutes before
+  // the start is only what it says when nobody says otherwise.
+  const departure = o.departure || addMinutes(o.start, -DEPARTURE_LEAD_MINUTES);
   // What the commander filled in on the form wins; anything they left alone
   // falls back to the proposal computed from the topic and the roster.
   const defaults = defaultLogistics(
@@ -329,11 +337,11 @@ export async function updateTraining(db: Db, t: TrainingFull, f: TrainingForm): 
     safety: f.safety,
     freq: f.freq,
     pickup: f.pickup,
+    departure: f.departure || addMinutes(f.start, -DEPARTURE_LEAD_MINUTES),
     notes: f.notes,
   };
 
   if (t.start !== f.start || t.end !== f.end) {
-    patch.departure = addMinutes(f.start, -DEPARTURE_LEAD_MINUTES);
     await sb().from('day_blocks').delete().eq('training_id', t.id);
     await sb()
       .from('day_blocks')
@@ -341,6 +349,9 @@ export async function updateTraining(db: Db, t: TrainingFull, f: TrainingForm): 
         defaultDayBlocks(f.start, f.end, topicId).map((b, i) => ({ ...b, training_id: t.id, sort: i })),
       );
   }
+
+  if (patch.departure !== t.departure)
+    await sb().from('vehicles').update({ departure: patch.departure }).eq('training_id', t.id);
 
   const { error } = await sb().from('trainings').update(patch).eq('id', t.id);
   check(error);
@@ -903,8 +914,13 @@ export async function savePerson(
   if (row.medical_profile !== null && (row.medical_profile < 21 || row.medical_profile > 97))
     throw new Error('פרופיל רפואי חייב להיות בין 21 ל-97 (או ריק)');
 
-  // never let an administrator strip their own management rights
-  if (personId === user.id && !row.is_admin && !row.is_hapak_commander) {
+  // Never let an administrator strip their own management rights — but only an
+  // administrator. A team commander editing his own card is not renouncing
+  // anything, and this line used to hand him `is_admin` on the way past, which
+  // the database then refused: his own details would not save at all.
+  const editingSelfAsAdmin =
+    personId === user.id && (user.is_admin || user.is_hapak_commander);
+  if (editingSelfAsAdmin && !row.is_admin && !row.is_hapak_commander) {
     row.is_admin = true;
   }
 

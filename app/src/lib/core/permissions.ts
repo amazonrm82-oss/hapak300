@@ -76,7 +76,7 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
     canManagePeriod: isAdmin,
     canGrantRoles: isAdmin,
     canDeleteTraining: isAdmin,
-    canEditCerts: isAdmin,
+    canEditCerts: isAdmin || isAnyTeamCmd,
     canCalendar: isAdmin,
     seesFeedback: isAdmin || isTeamCmd || isTrainCmd || isInstr,
     canExport: isAdmin || isAnyTeamCmd || isTrainCmd,
@@ -102,8 +102,15 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
 export function canEditPerson(user: Person | null, target: Person): boolean {
   if (!user) return false;
   if (user.is_admin) return true;
-  if (!user.is_hapak_commander) return false;
-  return !target.is_admin || target.id === user.id;
+  if (user.is_hapak_commander) return !target.is_admin || target.id === user.id;
+  // a team commander runs his own team's cards: every detail on them, but none
+  // of the four rights that would appoint someone alongside or above him
+  return !!(user.is_team_commander && user.team_id && target.team_id === user.team_id);
+}
+
+/** Appointing a commander, an instructor or an administrator — never a team commander's. */
+export function canGrantRights(user: Person | null): boolean {
+  return !!(user && (user.is_admin || user.is_hapak_commander));
 }
 
 export function roleLabel(db: Db, p: Person | null): string {

@@ -7,7 +7,7 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
 import { certAlerts } from '@/lib/core/alerts';
 import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
-import { permsFor, roleLabel } from '@/lib/core/permissions';
+import { canEditPerson, permsFor, roleLabel } from '@/lib/core/permissions';
 import { readinessOf } from '@/lib/core/readiness';
 import { fullName, personById, teamMembers, topicName } from '@/lib/core/selectors';
 import type { Person, TeamKey } from '@/lib/core/types';
@@ -322,13 +322,13 @@ export default function TeamsPage() {
                             {pr}
                           </span>
                         )}
-                        {(perms.canManagePeople || perms.canEditKit) && (
+                        {(canEditPerson(user, p) || perms.canEditKit) && (
                           <button
                             className="btn btn-ghost"
                             style={{ fontSize: 12 }}
-                            onClick={() => (perms.canManagePeople ? setEditing(p) : setEditingKit(p))}
+                            onClick={() => (canEditPerson(user, p) ? setEditing(p) : setEditingKit(p))}
                           >
-                            {perms.canManagePeople ? 'עריכה' : 'נשק והכשרות'}
+                            {canEditPerson(user, p) ? 'עריכה' : 'נשק והכשרות'}
                           </button>
                         )}
                       </div>
@@ -350,13 +350,13 @@ export default function TeamsPage() {
                 <span style={{ fontSize: 13 }}>{fullName(p)}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>{roleLabel(db, p)}</span>
               </span>
-              {(perms.canManagePeople || perms.canEditKit) && (
+              {(canEditPerson(user, p) || perms.canEditKit) && (
                 <button
                   className="btn btn-ghost"
                   style={{ fontSize: 12 }}
-                  onClick={() => (perms.canManagePeople ? setEditing(p) : setEditingKit(p))}
+                  onClick={() => (canEditPerson(user, p) ? setEditing(p) : setEditingKit(p))}
                 >
-                  {perms.canManagePeople ? 'עריכה' : 'נשק והכשרות'}
+                  {canEditPerson(user, p) ? 'עריכה' : 'נשק והכשרות'}
                 </button>
               )}
             </div>
