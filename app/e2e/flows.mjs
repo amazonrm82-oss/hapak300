@@ -277,11 +277,11 @@ try {
     const davidRow = page.locator('tbody tr').filter({ hasText: 'דוד בדיקה' }).first();
     await davidRow.locator('button:has-text("עדכון")').click();
     await settle(800);
+    // one tap is the whole answer: picking ״מגיע״ saves and closes the dialog
     await page.locator('button:text-is("מגיע")').first().click();
-    await settle(400);
-    await click('שמירה');
-    await settle(1500);
+    await settle(2000);
     check('המפקד סימן את הלוחם כנוכח', (await davidRow.innerText()).includes('מגיע'));
+    check('והחלון נסגר על אותה לחיצה', (await page.locator('[role="dialog"]').count()) === 0);
 
     // ── drills ──
     await click('מקצים');

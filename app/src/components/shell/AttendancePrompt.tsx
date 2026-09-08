@@ -22,7 +22,8 @@ const SEEN_KEY = 'hapak-attendance-asked';
  * It asks once per training per session — closing it is allowed, and the
  * question comes back next time rather than blocking the app. A reason is
  * required for anything other than coming, exactly as on the attendance tab, so
- * the commander is never left with an unexplained gap.
+ * the commander is never left with an unexplained gap. One tap is the whole
+ * answer, and it is final: changing it afterwards is a commander's update.
  */
 export function AttendancePrompt() {
   const { db, user, today, toast, refresh } = useApp();
@@ -56,15 +57,20 @@ export function AttendancePrompt() {
       toast('חובה לציין סיבה כשלא מגיעים');
       return;
     }
+    // the window closes on the tap, not after the round trip: a phone on a bad
+    // signal should not leave someone staring at a dialog they already answered
+    const answered = asking;
     setBusy(true);
+    remember(answered.id);
+    setAsking(null);
     try {
-      await markAttendance(asking.id, user.id, status, reason);
-      remember(asking.id);
+      await markAttendance(answered.id, user.id, status, reason);
       await refresh();
       toast(status === 'absent' ? 'נרשם שאינך מגיע' : 'תודה — נרשמת');
-      setAsking(null);
     } catch (e) {
+      // it did not save, so put the question back rather than lose the answer
       toast(e instanceof Error ? e.message : 'הסימון נכשל');
+      setAsking(answered);
     } finally {
       setBusy(false);
     }
@@ -115,7 +121,7 @@ export function AttendancePrompt() {
       </div>
 
       <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
-        אפשר לשנות את התשובה עד תחילת האימון, במסך הנוכחות של האימון.
+        התשובה נרשמת מיד. שינוי אחר כך הוא דרך מפקד הצוות.
       </span>
     </Dialog>
   );

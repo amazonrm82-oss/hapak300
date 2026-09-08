@@ -37,11 +37,19 @@ export function AttendanceDialog({ training, personId, onClose, sheet }: Props) 
 
   const needsReason = !!status && status !== 'coming' && status !== 'late';
 
-  async function save() {
-    if (!status) return toast('בחר סטטוס נוכחות');
+  /**
+   * Saves and closes.
+   *
+   * Picking ״מגיע״ is the whole answer, so the tap that picks it is the tap that
+   * ends the dialog — asking someone to choose and then confirm the choice they
+   * just made is a second tap that adds nothing. Only the statuses that need a
+   * reason keep the two steps, because the reason is still to be typed.
+   */
+  async function save(pick: AttStatus | '' = status, why = reason) {
+    if (!pick) return toast('בחר סטטוס נוכחות');
     setBusy(true);
     try {
-      await markAttendance(training!.id, target!, status, reason);
+      await markAttendance(training!.id, target!, pick, why);
       await refresh();
       toast(target === user?.id ? 'הנוכחות שלך נשמרה' : 'הנוכחות עודכנה');
       onClose();
@@ -65,9 +73,11 @@ export function AttendanceDialog({ training, personId, onClose, sheet }: Props) 
           <button className="btn btn-secondary" onClick={onClose}>
             ביטול
           </button>
-          <button className="btn btn-primary" onClick={() => void save()} disabled={busy}>
-            שמירה
-          </button>
+          {needsReason && (
+            <button className="btn btn-primary" onClick={() => void save()} disabled={busy}>
+              שמירה
+            </button>
+          )}
         </>
       }
     >
@@ -86,7 +96,11 @@ export function AttendanceDialog({ training, personId, onClose, sheet }: Props) 
           <button
             key={s.id}
             className={`btn ${status === s.id ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setStatus(s.id)}
+            onClick={() => {
+              setStatus(s.id);
+              // coming and late need nothing else, so this tap is the answer
+              if (s.id === 'coming' || s.id === 'late') void save(s.id, '');
+            }}
             style={{ minHeight: 46 }}
           >
             {s.label}
@@ -107,7 +121,9 @@ export function AttendanceDialog({ training, personId, onClose, sheet }: Props) 
       )}
 
       <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
-        אפשר לעדכן עד תחילת האימון. מי שלא סימן נחשב ״לא מגיע״. מפקד הצוות מאשר את הנוכחות הסופית.
+        {target === user?.id
+          ? 'התשובה נרשמת מיד ואינה ניתנת לשינוי — שינוי הוא עדכון של מפקד הצוות. מי שלא סימן נחשב ״לא מגיע״.'
+          : 'מי שלא סימן נחשב ״לא מגיע״. מפקד הצוות מאשר את הנוכחות הסופית.'}
       </span>
     </Dialog>
   );
