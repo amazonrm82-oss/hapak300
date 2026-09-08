@@ -154,13 +154,20 @@ try {
   await settle(1500);
   check('הוספת לוחם לצוות סדיר', await has('דוד בדיקה'));
 
+  // the roles the unit actually has, including the two newest
+  const roleOptions = (await byLabel('תפקיד').locator('option').allInnerTexts()).join(' | ');
+  check('רס״פ וסמל צוות מופיעים ברשימת התפקידים', roleOptions.includes('רס״פ') && roleOptions.includes('סמל צוות'));
+
   // a second fighter to be the training's instructor: the plain fighter must
-  // stay plain for the checks at the end to mean anything
+  // stay plain for the checks at the end to mean anything. He carries one of
+  // the new roles, so the round trip through the database is checked too.
   await byLabel('שם מלא').fill('אבי מדריך');
   await byLabel('מספר אישי').fill('7654322');
+  await byLabel('תפקיד').selectOption('סמל צוות');
   await byLabel('צוות').selectOption('a');
   await click('הוסף');
   await settle(1500);
+  check('ותפקיד חדש נשמר ומוצג ברשימת הכוח', await has('סמל צוות'));
 
   // and an officer holding no command post, to check that the commission alone
   // qualifies him to command a training

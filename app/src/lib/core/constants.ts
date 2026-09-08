@@ -70,7 +70,9 @@ export const isOfficer = (rank: string): boolean => OFFICER_RANKS.includes(rank)
 // `is_hapak_commander` checkbox on the same form.
 export const ROLES = [
   'מפקד צוות',
+  'סמל צוות',
   'מפקד חפ״ק',
+  'רס״פ',
   'קמב״צ',
   'קשר',
   'נהג',
