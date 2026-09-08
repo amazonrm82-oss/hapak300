@@ -14,19 +14,25 @@ const BASE = process.argv[2] ?? 'http://localhost:3210';
 
 let pass = 0;
 let fail = 0;
+let step = 0;
 const problems = [];
 
-const ok = (n, label) => {
+// checks number themselves in the order they run, so inserting one in the
+// middle does not renumber every check after it
+const n = () => String(++step).padStart(2, '0');
+
+const ok = (label) => {
   pass++;
-  console.log(`✅  ${String(n).padStart(2, '0')}  ${label}`);
+  console.log(`✅  ${n()}  ${label}`);
 };
-const bad = (n, label, detail = '') => {
+const bad = (label, detail = '') => {
   fail++;
-  problems.push(`${n} ${label}${detail ? ` — ${detail}` : ''}`);
-  console.log(`❌  ${String(n).padStart(2, '0')}  ${label}${detail ? ` — ${detail}` : ''}`);
+  const at = n();
+  problems.push(`${at} ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(`❌  ${at}  ${label}${detail ? ` — ${detail}` : ''}`);
 };
 
-const check = (n, label, cond, detail) => (cond ? ok(n, label) : bad(n, label, detail));
+const check = (label, cond, detail) => (cond ? ok(label) : bad(label, detail));
 
 /** Runs a step whose whole point is to be refused. */
 const refused = async (fn) => {
@@ -74,28 +80,28 @@ async function click(label, nth = 0) {
 }
 
 try {
-  // ── 1. the login screen ──
+  // ── the login screen ──
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  check(1, 'מסך הכניסה נטען', await has('מספר אישי'));
+  check('מסך הכניסה נטען', await has('מספר אישי'));
 
-  // ── 2. an unknown personal number is refused ──
+  // ── an unknown personal number is refused ──
   await page.fill('input', '9999999');
   await refused(async () => {
     await click('המשך');
     await settle(900);
   });
-  check(2, 'מספר אישי לא רשום נדחה', await has('לא רשום'));
+  check('מספר אישי לא רשום נדחה', await has('לא רשום'));
 
-  // ── 3. the administrator's first login asks for a code, without naming them ──
+  // ── the administrator's first login asks for a code, without naming them ──
   await page.reload({ waitUntil: 'networkidle' });
   await page.fill('input', '8409505');
   await click('המשך');
   await settle(900);
   const body3 = await text();
-  check(3, 'מספר אישי מוכר עובר לשלב הקוד', body3.includes('קוד'));
-  check(4, 'ולא חושף שם או דרגה לפני אימות', !body3.includes('מתן זזון'));
+  check('מספר אישי מוכר עובר לשלב הקוד', body3.includes('קוד'));
+  check('ולא חושף שם או דרגה לפני אימות', !body3.includes('מתן זזון'));
 
-  // ── 5. choosing a code, and the weak-code rule ──
+  // ── choosing a code, and the weak-code rule ──
   const pins = await page.locator('input[type="password"]');
   await pins.nth(0).fill('1234');
   if ((await pins.count()) > 1) await pins.nth(1).fill('1234');
@@ -103,7 +109,7 @@ try {
     await click('שמור קוד');
     await settle(900);
   });
-  check(5, 'קוד חלש (1234) נדחה', await has('פחות צפוי'));
+  check('קוד חלש (1234) נדחה', await has('פחות צפוי'));
 
   const pins2 = await page.locator('input[type="password"]');
   await pins2.nth(0).fill('8317');
@@ -111,9 +117,9 @@ try {
   await click('שמור קוד');
   await page.waitForURL(/\/(schedule|my)/, { timeout: 15000 }).catch(() => {});
   await settle(1500);
-  check(6, 'כניסה ראשונה מצליחה ונכנסים ללו״ז', page.url().includes('/schedule'));
+  check('כניסה ראשונה מצליחה ונכנסים ללו״ז', page.url().includes('/schedule'));
 
-  // ── 7. the code was actually stored: sign out, sign back in with it ──
+  // ── the code was actually stored: sign out, sign back in with it ──
   await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
   await settle();
   await click('יציאה');
@@ -123,19 +129,19 @@ try {
   await click('המשך');
   await settle(900);
   const askedAgain = await has('כניסה ראשונה');
-  check(7, 'הכניסה השנייה מבקשת רק את הקוד, לא בחירה מחדש', !askedAgain);
+  check('הכניסה השנייה מבקשת רק את הקוד, לא בחירה מחדש', !askedAgain);
 
   await page.locator('input[type="password"]').first().fill('8317');
   await click('כניסה');
   await page.waitForURL(/\/schedule/, { timeout: 15000 }).catch(() => {});
   await settle(1500);
-  check(8, 'כניסה עם הקוד שנבחר מצליחה', page.url().includes('/schedule'));
+  check('כניסה עם הקוד שנבחר מצליחה', page.url().includes('/schedule'));
 
-  // ── 9. the roster, and adding a fighter to סדיר ──
+  // ── the roster, and adding a fighter to סדיר ──
   await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
   await settle(1200);
   const teamsBody = await text();
-  check(9, 'מסך הצוותים מציג את שלושת הצוותים', teamsBody.includes('סדיר'));
+  check('מסך הצוותים מציג את שלושת הצוותים', teamsBody.includes('סדיר'));
 
   // the quick-add row is a set of labelled fields, so address them by label
   const byLabel = (label) =>
@@ -146,25 +152,33 @@ try {
   await byLabel('צוות').selectOption('c');
   await click('הוסף');
   await settle(1500);
-  check(10, 'הוספת לוחם לצוות סדיר', await has('דוד בדיקה'));
+  check('הוספת לוחם לצוות סדיר', await has('דוד בדיקה'));
 
-  // a second fighter, in צוות א׳, to be the training's instructor: the two
-  // seeded people belong to no team and so cannot be offered as one, and the
-  // plain fighter must stay plain for the checks at the end to mean anything
+  // a second fighter to be the training's instructor: the plain fighter must
+  // stay plain for the checks at the end to mean anything
   await byLabel('שם מלא').fill('אבי מדריך');
   await byLabel('מספר אישי').fill('7654322');
   await byLabel('צוות').selectOption('a');
   await click('הוסף');
   await settle(1500);
 
-  // ── 11. creating a training with logistics ──
+  // and an officer holding no command post, to check that the commission alone
+  // qualifies him to command a training
+  await byLabel('שם מלא').fill('רון קצין');
+  await byLabel('מספר אישי').fill('7654323');
+  await byLabel('דרגה').selectOption('סרן');
+  await byLabel('צוות').selectOption('a');
+  await click('הוסף');
+  await settle(1500);
+
+  // ── creating a training with logistics ──
   // the create button lives on the schedule, next to the week it would fall in
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
   await settle(1200);
   await click('אימון חדש');
   await settle(900);
   const dialog = await has('נושא');
-  check(11, 'טופס אימון חדש נפתח', dialog);
+  check('טופס אימון חדש נפתח', dialog);
 
   const today = new Date();
   const future = new Date(today.getTime() + 7 * 864e5).toISOString().slice(0, 10);
@@ -187,23 +201,32 @@ try {
       .getAttribute('value');
     await select.selectOption(value);
   };
+  // who each list offers: the HQ staff sit on no team but do instruct, and an
+  // officer may command a training whether or not he holds a command post
+  const optionsOf = async (fieldLabel) =>
+    byLabel(fieldLabel).locator('option').allInnerTexts();
+  const instructorNames = (await optionsOf('מדריך')).join(' | ');
+  const commanderNames = (await optionsOf('מפקד אימון')).join(' | ');
+  check('המפקדה מוצעת כמדריכה למרות שאינה בצוות', instructorNames.includes('ישראל קדוש'));
+  check('וקצין ללא תפקיד פיקודי מוצע כמפקד אימון', commanderNames.includes('רון קצין'));
+
   await pickPerson('מפקד אימון', 'זזון');
   await pickPerson('מדריך', 'אבי מדריך');
 
-  check(12, 'הצעת הלוגיסטיקה מופיעה בטופס', await has('ציוד נדרש'));
-  check(13, 'ובתוכה מזון ומים ותחמושת', (await has('מזון ומים')) && (await has('תחמושת')));
+  check('הצעת הלוגיסטיקה מופיעה בטופס', await has('ציוד נדרש'));
+  check('ובתוכה מזון ומים ותחמושת', (await has('מזון ומים')) && (await has('תחמושת')));
 
   await click('שמירה ופרסום');
   await settle(2500);
   const created = page.url().includes('/trainings/');
-  check(14, 'האימון נוצר ונפתח', created);
+  check('האימון נוצר ונפתח', created);
 
   let trainingUrl = null;
   if (created) {
     trainingUrl = page.url();
-    check(15, 'מסך האימון מציג לשונית מקצים', await has('מקצים'));
+    check('מסך האימון מציג לשונית מקצים', await has('מקצים'));
 
-    // ── 16. drills ──
+    // ── drills ──
     await click('מקצים');
     await settle(900);
     await click('הוספת מקצה');
@@ -213,7 +236,7 @@ try {
     await page.locator('textarea').first().fill('20 כדורים, 5 מטרות, 50 מ׳');
     await click('הוסף מקצה');
     await settle(1500);
-    check(16, 'מקצה נוסף לאימון', await has('ירי בעמידה'));
+    check('מקצה נוסף לאימון', await has('ירי בעמידה'));
 
     // open it and record a result for one fighter. The row is addressed by his
     // name: the commander's own grade box is numeric too, and sits above the
@@ -229,59 +252,59 @@ try {
       await numeric.nth(1).fill('17'); // פגיעות
       await numeric.nth(1).blur();
       await settle(1500);
-      check(17, 'הציון מחושב מהפגיעות (17/20 = 85)', (await row.innerText()).includes('85.0'));
+      check('הציון מחושב מהפגיעות (17/20 = 85)', (await row.innerText()).includes('85.0'));
     } else {
-      bad(17, 'הציון מחושב מהפגיעות', 'לא נמצאו שדות קלט בשורת הלוחם');
+      bad('הציון מחושב מהפגיעות', 'לא נמצאו שדות קלט בשורת הלוחם');
     }
 
-    // ── 18. the commander's grade for the training ──
+    // ── the commander's grade for the training ──
     await byLabel('ציון המפקד לאימון (0–100)').fill('88');
     await click('שמור ציון');
     await settle(1500);
-    check(18, 'ציון המפקד לאימון נשמר', await has('88'));
+    check('ציון המפקד לאימון נשמר', await has('88'));
 
-    // ── 19. attendance ──
+    // ── attendance ──
     await page.goto(trainingUrl, { waitUntil: 'networkidle' });
     await settle(1200);
     await click('נוכחות');
     await settle(1000);
-    check(19, 'לשונית הנוכחות מציגה את הכוח', await has('דוד בדיקה'));
-    check(20, 'ולוחם סדיר מופיע באימון של צוות א׳', await has('דוד בדיקה'));
+    check('לשונית הנוכחות מציגה את הכוח', await has('דוד בדיקה'));
+    check('ולוחם סדיר מופיע באימון של צוות א׳', await has('דוד בדיקה'));
   }
 
-  // ── 21. every screen renders ──
-  for (const [i, path] of [
-    ['21', '/schedule'],
-    ['22', '/trainings'],
-    ['23', '/teams'],
-    ['24', '/logistics'],
-    ['25', '/calendar'],
-    ['26', '/archive'],
-    ['27', '/manage'],
-    ['28', '/profile'],
-    ['29', '/install'],
-    ['30', '/my'],
-    ['31', '/chat'],
+  // ── every screen renders ──
+  for (const path of [
+    '/schedule',
+    '/trainings',
+    '/teams',
+    '/logistics',
+    '/calendar',
+    '/archive',
+    '/manage',
+    '/profile',
+    '/install',
+    '/my',
+    '/chat',
   ]) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' }).catch(() => {});
     await settle(900);
     const body = await text();
     const broke = body.includes('Application error') || body.trim().length < 40;
-    check(Number(i), `${path} נטען`, !broke, broke ? 'הדף ריק או קרס' : '');
+    check(`${path} נטען`, !broke, broke ? 'הדף ריק או קרס' : '');
   }
 
-  // ── 32. the audit log recorded what happened ──
+  // ── the audit log recorded what happened ──
   await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
   await settle(1500);
   const manageBody = await text();
-  check(32, 'יומן הפעולות רשם את הוספת הלוחם', manageBody.includes('דוד בדיקה'));
-  check(33, 'מסך הניהול מציג תקופות, דו״חות וגיבוי', manageBody.includes('גיבוי מלא'));
+  check('יומן הפעולות רשם את הוספת הלוחם', manageBody.includes('דוד בדיקה'));
+  check('מסך הניהול מציג תקופות, דו״חות וגיבוי', manageBody.includes('גיבוי מלא'));
 
-  // ── 34. no console errors anywhere ──
+  // ── no console errors anywhere ──
   const real = consoleErrors.filter(
     (e) => !/favicon|manifest|sw\.js|Failed to load resource: net::ERR_CONNECTION/i.test(e),
   );
-  // ── 35. the same app, entered as a plain fighter ──
+  // ── the same app, entered as a plain fighter ──
   //
   // Everything up to here was done as the administrator, who is allowed
   // everything — which proves nothing about what anyone else can reach. This
@@ -303,52 +326,48 @@ try {
   await click('שמור קוד');
   await page.waitForURL(/\/(schedule|my)/, { timeout: 15000 }).catch(() => {});
   await settle(1500);
-  check(34, 'לוחם רגיל נכנס למערכת בקוד שבחר', !page.url().includes('/login'));
+  check('לוחם רגיל נכנס למערכת בקוד שבחר', !page.url().includes('/login'));
 
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
   await settle(1200);
   const canCreate = await page.locator('button:has-text("אימון חדש")').count();
-  check(35, 'ואין לו כפתור ליצירת אימון', canCreate === 0);
+  check('ואין לו כפתור ליצירת אימון', canCreate === 0);
 
   await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
   await settle(1200);
-  check(36, 'מסך הניהול חסום בפניו', await has('ניהול התקופה שמור'));
-  check(37, 'ויומן הפעולות אינו נגלה לו', !(await has('יומן פעולות')));
+  check('מסך הניהול חסום בפניו', await has('ניהול התקופה שמור'));
+  check('ויומן הפעולות אינו נגלה לו', !(await has('יומן פעולות')));
 
   await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
   await settle(1200);
   const teamsAsFighter = await text();
-  check(38, 'אינו רואה מספר אישי של אחר', !teamsAsFighter.includes('8409505'));
+  check('אינו רואה מספר אישי של אחר', !teamsAsFighter.includes('8409505'));
 
   if (trainingUrl) {
     await page.goto(trainingUrl, { waitUntil: 'networkidle' });
     await settle(1200);
     await click('מקצים');
     await settle(1000);
-    check(39, 'אין לו תיבת ציון לאימון', (await page.locator('button:has-text("שמור ציון")').count()) === 0);
+    check('אין לו תיבת ציון לאימון', (await page.locator('button:has-text("שמור ציון")').count()) === 0);
 
     await page.locator('button:has-text("ירי בעמידה")').first().click();
     await settle(900);
     const drillTable = page.locator('table').first();
     const tableText = await drillTable.innerText();
-    check(
-      40,
-      'רואה במקצה רק את עצמו',
+    check('רואה במקצה רק את עצמו',
       tableText.includes('דוד בדיקה') && !tableText.includes('אבי מדריך'),
     );
     const editable = await drillTable.locator('input:not([disabled])').count();
-    check(41, 'ואינו יכול לשנות תוצאות', editable === 0);
+    check('ואינו יכול לשנות תוצאות', editable === 0);
   }
 
   const badResponses = failedRequests.filter((r) => !/favicon|manifest|sw\.js/.test(r));
-  check(
-    42,
-    'אין שגיאות בקונסולה בכל המסכים',
+  check('אין שגיאות בקונסולה בכל המסכים',
     real.length === 0,
     [...new Set(badResponses)].slice(0, 6).join(' | ') || real.slice(0, 3).join(' | '),
   );
 } catch (e) {
-  bad(99, 'הריצה נעצרה', e.message);
+  bad('הריצה נעצרה', e.message);
 } finally {
   console.log(`\nעברו: ${pass}   נכשלו: ${fail}`);
   if (problems.length) console.log('\nכשלים:\n  ' + problems.join('\n  '));

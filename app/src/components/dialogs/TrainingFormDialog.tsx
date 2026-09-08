@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { LogisticsEditor, type LogisticsDraft } from '@/components/dialogs/LogisticsEditor';
 import { Field } from '@/components/ui/bits';
-import { DEFAULT_FREQ, DEFAULT_PICKUP } from '@/lib/core/constants';
+import { DEFAULT_FREQ, DEFAULT_PICKUP, isOfficer } from '@/lib/core/constants';
 import { addDays, weekStart } from '@/lib/core/dates';
 import { defaultLogistics } from '@/lib/core/defaults';
 import { roleLabel } from '@/lib/core/permissions';
@@ -127,12 +127,23 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
   };
 
   const people = db.people.filter((p) => p.status === 'active');
+  // Certified instructors first, then everyone else who could be asked to run a
+  // station — anyone on a team, and the HQ staff, who belong to no team but do
+  // instruct. Leaving the staff out made the unit's own leadership the only
+  // people who could not be named instructor of a training.
   const instructorOpts = [
     ...people.filter((p) => p.is_instructor),
-    ...people.filter((p) => !p.is_instructor && p.team_id),
+    ...people.filter((p) => !p.is_instructor),
   ];
+  // Command of a training follows the commission: any officer may hold it,
+  // alongside the posts that carry it regardless of rank.
   const commanderOpts = people.filter(
-    (p) => p.is_team_commander || p.role === 'קמב״צ' || p.is_hapak_commander || p.is_admin,
+    (p) =>
+      p.is_team_commander ||
+      p.role === 'קמב״צ' ||
+      p.is_hapak_commander ||
+      p.is_admin ||
+      isOfficer(p.rank),
   );
 
   async function save() {
