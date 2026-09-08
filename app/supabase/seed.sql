@@ -10,7 +10,7 @@ insert into settings (id, app_name, unit_name, brigade_commander, period_start, 
                       evening_reminder, morning_reminder_before, approval_window_hours,
                       cert_alert_days, summary_lock_days)
 values (true, 'כשירות חפ״ק מח״ט 300', 'חפ״ק מח״ט 300', '', '2026-09-20', 'חורף 2026',
-        true, true, 6, array['חובש','נהג','מאבטח'], 48, '18:00', 120, 48, 30, 7)
+        true, true, 6, array['חובש'], 48, '18:00', 120, 48, 30, 7)
 on conflict (id) do nothing;
 
 -- סדיר has no trainings of its own: its members are rostered to every training

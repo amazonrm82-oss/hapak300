@@ -168,10 +168,11 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
-          תפקידים חיוניים — חסרונם מקפיץ אזהרה למפקד
+          תפקידים חיוניים — חסרונם מקפיץ אזהרה למפקד. נהג אינו ברשימה: הוא נדרש רק
+          באימון שיש בו רכב, ואז נבדק לפי ההסמכה בתוקף.
         </span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {ROLES.filter((r) => r !== 'מפקד צוות').map((r) => (
+          {ROLES.filter((r) => r !== 'מפקד צוות' && r !== 'נהג').map((r) => (
             <label
               key={r}
               style={{

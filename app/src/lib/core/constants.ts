@@ -73,7 +73,16 @@ export const ROLES = [
   'מטוליסט',
   'מפק״ץ',
 ] as const;
-export const ESSENTIAL_ROLES = ['חובש', 'נהג', 'מאבטח'] as const;
+/**
+ * The posts whose absence raises a warning on every training.
+ *
+ * A medic is wanted wherever there is live fire; a guard is not — plenty of
+ * trainings need none, and a warning that fires every time is a warning nobody
+ * reads. A driver is missing from the list on purpose: he is required only when
+ * the training actually takes a vehicle, which `trainingAlerts` decides from the
+ * vehicle list rather than from here.
+ */
+export const ESSENTIAL_ROLES = ['חובש'] as const;
 
 /**
  * The two posts that carry rights of their own, named once so the screens and

@@ -98,7 +98,20 @@ with checks(sort, patch, what, ok) as (values
   (29, '05', 'תשובת נוכחות ניתנת פעם אחת',
    exists (select 1 from pg_policies
             where tablename = 'attendance' and policyname = 'attendance_update'
-              and qual not like '%me_id%'))
+              and qual not like '%me_id%')),
+  (30, '05', 'נהג הוא סימון בפני עצמו, בנוסף לתפקיד',
+   exists (select 1 from information_schema.columns
+            where table_name = 'people_view' and column_name = 'is_driver')),
+  (31, '05', 'מאבטח ונהג אינם נדרשים בכל אימון',
+   not (select essential_roles && array['מאבטח', 'נהג'] from public.settings limit 1)),
+  -- הבדיקה הקריטית מבין כולן: מי שלא נכנס למערכת לא רואה שום דבר.
+  -- התצוגות רצות בהרשאות הבעלים ואינן עוברות דרך מדיניות השורות, ולכן
+  -- אם ההרשאה הזאת פתוחה — כל מי שמחזיק את המפתח הציבורי קורא את כל היחידה.
+  (32, '05', 'מי שלא נכנס אינו רואה שמות, טלפונים או לו״ז',
+   not has_table_privilege('anon', 'public.people_view', 'select')
+   and not has_table_privilege('anon', 'public.trainings_view', 'select')),
+  (33, '05', 'אבל בקשת הצטרפות מבחוץ עדיין נכנסת',
+   has_table_privilege('anon', 'public.join_requests', 'insert'))
 )
 
 select
@@ -127,6 +140,7 @@ select case
                 where table_name = 'people_view' and column_name = 'nvg_serial')
    and exists (select 1 from information_schema.columns
                 where table_name = 'trainings_view' and column_name = 'fire_mode')
+   and not has_table_privilege('anon', 'public.people_view', 'select')
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

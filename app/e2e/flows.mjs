@@ -321,6 +321,37 @@ try {
     check('המפקד סימן את הלוחם כנוכח', (await davidRow.innerText()).includes('מגיע'));
     check('והחלון נסגר על אותה לחיצה', (await page.locator('[role="dialog"]').count()) === 0);
 
+    // Now that someone has answered, the alert list is live. This training was
+    // created with no vehicle, so neither a driver nor a guard is owed — an
+    // alert that fires on every training is one nobody reads.
+    // Now that someone has answered, the alert list is live. The proposal
+    // above put three vehicles on this training, so a driver is owed — and a
+    // guard is not, at any point.
+    let body = await page.locator('body').innerText();
+    check('רשימת ההתראות פעילה — חסר חובש', body.includes('אין חובש'));
+    check('ועם רכבים באימון — חסר נהג מוסמך', body.includes('נהגים מוסמכים'));
+    check('ומאבטח אינו נדרש', !body.includes('אין מאבטח'), body.match(/.*מאבטח.*/)?.[0]);
+
+    // take the vehicles off, and the driver stops being owed with them
+    await click('לוגיסטיקה ותחמושת');
+    await settle(900);
+    await page.locator('button').filter({ hasText: /^רכבים \(\d+\)$/ }).first().click();
+    await settle(900);
+    for (let i = 0; i < 6; i++) {
+      const remove = page.locator('table').locator('button:text-is("הסר")');
+      if ((await remove.count()) === 0) break;
+      await remove.first().click();
+      await settle(900);
+    }
+    await attendanceTab();
+    await settle(900);
+    body = await page.locator('body').innerText();
+    check(
+      'ובלי רכב באימון — אין דרישה לנהג',
+      !body.includes('נהגים מוסמכים'),
+      body.match(/.*נהגים.*/)?.[0],
+    );
+
     // ── drills ──
     await click('מקצים');
     await settle(900);

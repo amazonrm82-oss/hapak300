@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Heebo, Inter } from 'next/font/google';
 import './globals.css';
 import { DataProvider } from '@/lib/data/provider';
 import { Toast } from '@/components/ui/Toast';
@@ -28,6 +29,28 @@ export const metadata: Metadata = {
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * The two faces, downloaded at build time and served from this site.
+ *
+ * They used to be fetched from Google on every load. In a room with no signal
+ * — which is most of where this app is opened — that request is the one thing
+ * on the screen still waiting, and it also told Google who is looking. Built in,
+ * they arrive with the page, and the policy in the middleware no longer has to
+ * make room for a third party.
+ */
+const heebo = Heebo({
+  subsets: ['hebrew', 'latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-heebo',
+  display: 'swap',
+});
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -37,15 +60,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html dir="rtl" lang="he">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600&family=Inter:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html dir="rtl" lang="he" className={`${inter.variable} ${heebo.variable}`}>
       <body>
         <DataProvider>
           <div className="hapak-ground" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

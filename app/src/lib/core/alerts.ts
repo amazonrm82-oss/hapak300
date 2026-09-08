@@ -104,20 +104,28 @@ export function trainingAlerts(db: Db, t: TrainingFull, today: string, now: stri
   if (s.unresponded > 0) out.push(`${s.unresponded} טרם סימנו נוכחות`);
 
   const ps = participants(db, t);
-  db.settings.essential_roles.forEach((role) => {
-    const has = ps.some(
-      (p) => p.role === role && t.attendance[p.id] && ['coming', 'late'].includes(t.attendance[p.id].status),
-    );
-    if (!has && s.responded > 0)
-      out.push(role === 'חובש' ? 'אין חובש שסימן ״מגיע״' : `אין ${role} שסימן ״מגיע״`);
-  });
+  const here = (p: Person) =>
+    !!t.attendance[p.id] && ['coming', 'late'].includes(t.attendance[p.id].status);
 
-  const drivers = ps.filter(
-    (p) =>
-      p.role === 'נהג' && t.attendance[p.id] && ['coming', 'late'].includes(t.attendance[p.id].status),
-  ).length;
-  if (s.responded > 0 && drivers < t.vehicles.length)
-    out.push(`${drivers} נהגים מגיעים ל-${t.vehicles.length} רכבים`);
+  // A driver is wanted only when the training actually takes a vehicle, so the
+  // post is left out of the standing list and answered by the rule below.
+  db.settings.essential_roles
+    .filter((role) => role !== 'נהג')
+    .forEach((role) => {
+      const has = ps.some((p) => p.role === role && here(p));
+      if (!has && s.responded > 0)
+        out.push(role === 'חובש' ? 'אין חובש שסימן ״מגיע״' : `אין ${role} שסימן ״מגיע״`);
+    });
+
+  // Only a fighter marked as a driver with a licence in date counts: a name in
+  // the seat the army would not let behind the wheel is not a driver.
+  if (t.vehicles.length > 0) {
+    const drivers = ps.filter(
+      (p) => (p.is_driver || p.role === 'נהג') && canDrive(p, t.date) && here(p),
+    ).length;
+    if (s.responded > 0 && drivers < t.vehicles.length)
+      out.push(`${drivers} נהגים מוסמכים מגיעים ל-${t.vehicles.length} רכבים`);
+  }
 
   if (t.inst_status !== 'accepted')
     out.push(

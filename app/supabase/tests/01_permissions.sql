@@ -1205,3 +1205,12 @@ select case when (select role from people_view where name = 'איתי רוזן')
             then '✅' else '❌' end || '  133  ותפקידו נשאר כפי שהיה';
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ מה חובה בכל אימון ════════
+--
+-- מאבטח אינו חובה בכל אימון, ונהג נדרש רק כשמצוין רכב — ולכן שניהם אינם
+-- ברשימת התפקידים החיוניים, שהיא זו שמקפיצה אזהרה בכל אימון.
+
+select case when not (select essential_roles && array['מאבטח', 'נהג'] from settings limit 1)
+             and (select essential_roles @> array['חובש'] from settings limit 1)
+            then '✅' else '❌' end || '  134  מאבטח ונהג אינם ברשימת החובה, חובש כן';

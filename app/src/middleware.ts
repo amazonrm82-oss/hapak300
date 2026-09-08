@@ -38,8 +38,9 @@ export function middleware(request: NextRequest) {
     `frame-ancestors 'none'`,
     `form-action 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
-    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-    `font-src 'self' https://fonts.gstatic.com`,
+    `style-src 'self' 'unsafe-inline'`,
+    // הגופנים נבנים לתוך האתר, ולכן אין כאן שום צד שלישי
+    `font-src 'self'`,
     `img-src 'self' data: blob: ${sbHost}`.trim(),
     `connect-src 'self' ${sbHost} ${sbSocket}`.trim(),
     `worker-src 'self'`,

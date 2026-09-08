@@ -47,9 +47,10 @@
   --color-accent-800: #675322;
   --color-accent-900: #453717;
 
-  --font-heading: "Inter", "Heebo", system-ui, sans-serif;
+  /* שני הגופנים נבנים לתוך האתר (src/app/layout.tsx) ולא נטענים מגוגל */
+  --font-heading: var(--font-inter), var(--font-heebo), system-ui, sans-serif;
   --font-heading-weight: 500;
-  --font-body: "Inter", "Heebo", system-ui, sans-serif;
+  --font-body: var(--font-inter), var(--font-heebo), system-ui, sans-serif;
 
   --space-1: 2.8px;
   --space-2: 5.6px;

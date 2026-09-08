@@ -164,7 +164,10 @@ end $$;
 
 -- צ׳ הוא מספר פריט מבוקר: מוסתר מכולם חוץ מבעליו, מהמפקדים ומסמל הצוות —
 -- שהוא זה שרושם אותו. זה לא פותח לו את המספרים האישיים.
-create or replace view people_view as
+-- `create or replace view` יודע רק להוסיף עמודה בסוף — לא לשנות סדר.
+-- כאן is_driver נכנס לפני עמודות האמר״ל, ולכן התצוגה נמחקת ונבנית מחדש.
+drop view if exists people_view;
+create view people_view as
 select
   p.id,
   p.team_id,
@@ -206,20 +209,30 @@ where me_id() is not null or auth.uid() is null;
 grant select on people_view to authenticated;
 
 
--- ── נהג חייב רישיון בתוקף ──────────────────────────────────────────────────
+-- ── נהג: סימון בפני עצמו, ורישיון בתוקף ────────────────────────────────────
 --
--- נבדק מול יום האימון ולא מול היום שבו נערכה השורה: רישיון שפג בשבוע שלפני
--- אינו רישיון בבוקר שהשיירה יוצאת.
+-- A fighter drives on top of whatever else he does — a medic who drives is
+-- still the medic — so being offered as a driver is its own mark rather than a
+-- side effect of the `role` field, and it takes a licence in date on the day.
+--
+-- הרישיון נבדק מול יום האימון ולא מול היום שבו נערכה השורה: רישיון שפג בשבוע
+-- שלפני אינו רישיון בבוקר שהשיירה יוצאת.
 
 create or replace function guard_vehicle_driver() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
   day date;
+  marked boolean;
   licensed boolean;
 begin
   if new.driver_id is null then return new; end if;
   select t.date into day from trainings t where t.id = new.training_id;
   if day is null then return new; end if;
+
+  select p.is_driver or p.role = 'נהג' into marked from people p where p.id = new.driver_id;
+  if not coalesce(marked, false) then
+    raise exception 'רק מי שמוגדר נהג יכול להיות משובץ כנהג רכב';
+  end if;
 
   select coalesce(bool_or(
            p.certs ? k
@@ -335,43 +348,24 @@ create policy attendance_update on attendance for update to authenticated
   with check (can_approve_training(training_id) or is_training_cmd(training_id));
 
 
--- ── נהג הוא תפקיד נוסף, לא במקום ───────────────────────────────────────────
+-- ── מאבטח אינו חובה, ונהג נדרש רק כשיש רכב ─────────────────────────────────
 --
--- A fighter drives on top of whatever else he does — a medic who drives is
--- still the medic. Being offered as a driver is now its own mark rather than a
--- side effect of the `role` field, and it takes a licence in date on the day of
--- the training. Both are checked here, so a hidden option is not the rule.
+-- אזהרה שקופצת בכל אימון היא אזהרה שאיש כבר לא קורא. מאבטח אינו נדרש בכל
+-- אימון, ונהג נדרש רק באימון שמצוין בו רכב — ואז נספרים רק נהגים מוסמכים
+-- מול מספר הרכבים. שתי הבדיקות האלה יושבות ברשימת הרכבים, לא כאן.
 
-create or replace function guard_vehicle_driver() returns trigger
-language plpgsql security definer set search_path = public as $$
-declare
-  day date;
-  marked boolean;
-  licensed boolean;
-begin
-  if new.driver_id is null then return new; end if;
-  select t.date into day from trainings t where t.id = new.training_id;
-  if day is null then return new; end if;
+alter table settings alter column essential_roles set default array['חובש'];
 
-  select p.is_driver or p.role = 'נהג' into marked from people p where p.id = new.driver_id;
-  if not coalesce(marked, false) then
-    raise exception 'רק מי שמוגדר נהג יכול להיות משובץ כנהג רכב';
-  end if;
+-- מאבטח יורד רק אם איש לא נגע ברשימה מאז ההתקנה — בחירה של מנהל נשארת שלו
+update settings
+   set essential_roles = array['חובש']
+ where essential_roles @> array['חובש', 'נהג', 'מאבטח']
+   and coalesce(array_length(essential_roles, 1), 0) = 3;
 
-  select coalesce(bool_or(
-           p.certs ? k
-           and (p.certs->>k) ~ '^\d{4}-\d{2}-\d{2}$'
-           and (p.certs->>k)::date >= day), false)
-    into licensed
-    from people p
-    cross join unnest(array['drive', 'mildrive']) as k
-   where p.id = new.driver_id;
-
-  if not licensed then
-    raise exception 'נהג חייב נהיגה מבצעית או נהג רכב צבאי בתוקף ליום האימון';
-  end if;
-  return new;
-end $$;
+-- נהג יורד בכל מקרה: הוא נבדק מול רשימת הרכבים ולא מול הרשימה הזאת
+update settings
+   set essential_roles = array(select unnest(essential_roles) except select 'נהג')
+ where 'נהג' = any (essential_roles);
 
 
 -- ── מה שמותר למי שלא נכנס ──────────────────────────────────────────────────

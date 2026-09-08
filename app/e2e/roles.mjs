@@ -169,14 +169,22 @@ for (const role of ROLES) {
   for (const m of role.mustNot)
     check(`${role.name} אינו מקבל ״${m}״`, !labels.includes(m), 'הוצע לו והיה אמור להיחסם');
 
-  const realErrors = errors.filter((e) => !/favicon|manifest|sw\.js/i.test(e));
-  check(
-    `${role.name}: אין שגיאות בקונסולה`,
-    realErrors.length === 0,
-    [...new Set(dropped)].slice(0, 2).join(' | ') || realErrors.slice(0, 2).join(' | '),
+  // "Failed to load resource" says nothing on its own — the same event is in
+  // `failed` or `dropped` with the URL attached, and that is where it is judged.
+  const realErrors = errors.filter(
+    (e) => !/favicon|manifest|sw\.js/i.test(e) && !/Failed to load resource/i.test(e),
   );
+  check(`${role.name}: אין שגיאות בקונסולה`, realErrors.length === 0, realErrors.slice(0, 2).join(' | '));
+
   const realFailed = failed.filter((f) => !/favicon|manifest|sw\.js/i.test(f));
   check(`${role.name}: אין בקשות שנכשלו`, realFailed.length === 0, realFailed.slice(0, 2).join(' | '));
+
+  // A prefetch the browser cancels because we navigated away is not a fault:
+  // it lands as ERR_ABORTED on an `?_rsc=` URL and nothing on screen is missing.
+  const realDropped = [...new Set(dropped)].filter(
+    (d) => !(/_rsc=/.test(d) && /ERR_ABORTED/.test(d)) && !/favicon|manifest|sw\.js/i.test(d),
+  );
+  check(`${role.name}: ואין בקשה שנפלה באמצע`, realDropped.length === 0, realDropped.slice(0, 2).join(' | '));
 
   report.push({ role: role.name, offered: [...seen].filter(Boolean).sort() });
   await ctx.close();

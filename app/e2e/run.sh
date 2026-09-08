@@ -24,9 +24,21 @@ RUN_AS="${E2E_USER:-claude}"
 
 say() { printf '\n\033[1m── %s\033[0m\n' "$1"; }
 
+# Two runs at once share one database and two fixed ports, and each tears down
+# what the other is using: the browser then reports a reset connection and the
+# failure gets blamed on the app. One at a time — a stale lock from a run that
+# died is stepped over, a live one is not.
+LOCK=/tmp/hapak-e2e.lock
+if [ -f $LOCK ] && kill -0 "$(cat $LOCK 2>/dev/null)" 2>/dev/null; then
+  echo "כבר רצה בדיקה אחת (pid $(cat $LOCK), ports $PORT_SHIM/$PORT_APP). חכה שתסתיים." >&2
+  exit 2
+fi
+echo $$ > $LOCK
+
 cleanup() {
   fuser -k $PORT_SHIM/tcp 2>/dev/null
   fuser -k $PORT_APP/tcp 2>/dev/null
+  rm -f /tmp/hapak-e2e.lock
 }
 trap cleanup EXIT
 
