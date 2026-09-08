@@ -39,6 +39,8 @@ export interface Perms {
   canCatalogs: boolean;
   /** Weapon, weapon serial and certifications on anyone's card — and nothing else. */
   canEditKit: boolean;
+  /** Attach a fighter to another team's training, or arrange a makeup. */
+  canGuest: boolean;
 }
 
 // `_db` is kept in the signature so every call site reads the same as the
@@ -88,6 +90,7 @@ export function permsFor(_db: Db, user: Person | null, t: Training | null): Perm
     canLogistics: isAdmin || isTeamCmd || isTrainCmd || isInstr || isRasap,
     canCatalogs: isAdmin || isAnyTeamCmd || isRasap,
     canEditKit: isAdmin || isSergeant,
+    canGuest: isAdmin || isAnyTeamCmd,
   };
 }
 

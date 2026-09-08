@@ -1,3 +1,4 @@
+import { canDrive } from './alerts';
 import { DEPARTURE_LEAD_MINUTES, GEAR_CATALOG } from './constants';
 import { addDays, addMinutes, sundayOf } from './dates';
 import { topicSafety } from './selectors';
@@ -140,11 +141,16 @@ export function defaultVehicles(
   start: string,
   people: Person[],
   attendsAll: string[] = [],
+  date = '',
 ): NewVehicle[] {
+  // Only someone licensed on the day is proposed as a driver. Without this the
+  // proposal could name a driver the database then refuses, and the training
+  // would fail to save for a reason nobody could see on the form.
   const drivers = people.filter(
     (p) =>
       p.role === 'נהג' &&
       p.status === 'active' &&
+      (!date || canDrive(p, date)) &&
       (teamId === 'joint'
         ? !!p.team_id
         : p.team_id === teamId || (p.team_id ? attendsAll.includes(p.team_id) : false)),
@@ -192,6 +198,7 @@ export function defaultLogistics(
   people: Person[],
   location: string,
   attendsAll: string[] = [],
+  date = '',
 ): DefaultLogistics {
   // סדיר joins whatever א׳ or ב׳ are doing, so they count towards the food,
   // the seats and the ammunition for every training
@@ -206,7 +213,7 @@ export function defaultLogistics(
   return {
     gear: defaultGear(topicId),
     ammo: defaultAmmo(topicId, n),
-    vehicles: defaultVehicles(teamId, start, people, attendsAll),
+    vehicles: defaultVehicles(teamId, start, people, attendsAll, date),
     food: defaultFood(topicId, n, atBase),
   };
 }

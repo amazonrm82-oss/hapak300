@@ -1,9 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import webpush from 'web-push';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { admin } from '@/lib/server/admin';
-import { vapidSubject } from '@/lib/server/push';
+import { deliverPending } from '@/lib/server/push';
 
 /**
  * The reminders, run on a schedule (pg_cron in Supabase calls this route every
@@ -51,7 +50,7 @@ async function run(request: Request) {
   const clock = fmtTime(now);
 
   const created = await createReminders(db, today, clock);
-  const pushed = await deliverPush(db);
+  const pushed = await deliverPending(db);
   const backup = await weeklyBackup(db, now, today);
 
   return NextResponse.json({ ok: true, today, now: clock, created, pushed, backup });
@@ -203,64 +202,6 @@ async function createReminders(db: SupabaseClient, today: string, now: string): 
 }
 
 // ── web push ───────────────────────────────────────────────────────────────
-
-async function deliverPush(db: SupabaseClient): Promise<number> {
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) return 0; // push is optional
-
-  webpush.setVapidDetails(vapidSubject(), publicKey, privateKey);
-
-  const { data: pending } = await db
-    .from('notifications')
-    .select('*')
-    .is('pushed_at', null)
-    .order('time', { ascending: true })
-    .limit(100);
-  if (!pending?.length) return 0;
-
-  const [{ data: subs }, { data: people }] = await Promise.all([
-    db.from('push_subscriptions').select('*'),
-    db.from('people').select('id, notif'),
-  ]);
-  const prefs = new Map((people ?? []).map((p) => [p.id, p.notif ?? {}]));
-
-  let sent = 0;
-  for (const n of pending) {
-    const recipients: string[] = n.to ?? (people ?? []).map((p) => p.id);
-
-    for (const personId of recipients) {
-      const pref = prefs.get(personId) ?? {};
-      if (n.kind === 'evening' && pref.evening === false) continue;
-      if (n.kind === 'morning' && pref.morning === false) continue;
-      if (n.kind === 'approved' && pref.approved === false) continue;
-      if (n.kind === 'changed' && pref.changed === false) continue;
-
-      for (const s of (subs ?? []).filter((x) => x.person_id === personId)) {
-        try {
-          await webpush.sendNotification(
-            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-            JSON.stringify({
-              title: 'כשירות חפ״ק מח״ט 300',
-              body: n.text,
-              url: n.training_id ? `/trainings/${n.training_id}` : '/schedule',
-              tag: n.id,
-            }),
-          );
-          sent++;
-        } catch (err) {
-          // 404/410 means the browser dropped the subscription — clean it up
-          const status = (err as { statusCode?: number }).statusCode;
-          if (status === 404 || status === 410)
-            await db.from('push_subscriptions').delete().eq('endpoint', s.endpoint);
-        }
-      }
-    }
-
-    await db.from('notifications').update({ pushed_at: new Date().toISOString() }).eq('id', n.id);
-  }
-  return sent;
-}
 
 // ── the weekly backup ──────────────────────────────────────────────────────
 

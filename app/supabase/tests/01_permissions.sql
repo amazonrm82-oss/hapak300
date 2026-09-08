@@ -841,3 +841,92 @@ begin
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ נהג חייב רישיון בתוקף ════════
+--
+-- זו ההסמכה היחידה שחוסמת ולא רק מתריעה, ולכן היא נבדקת מול יום האימון
+-- ולא מול היום שבו מישהו ערך את השורה.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+do $t$ begin
+  insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
+  values ((select id from trainings limit 1), 'האמר', '1234567',
+          (select id from people_view where name = 'תומר גל'), 6, '05:30', 90);
+  raise notice '❌  107  שובץ נהג בלי רישיון — כשל בטיחות';
+exception when others then
+  raise notice '✅  107  נהג בלי רישיון בתוקף נחסם';
+end $t$;
+
+-- עם רישיון בתוקף ליום האימון
+update people set certs = jsonb_build_object('mildrive', to_char(current_date + 200, 'YYYY-MM-DD'))
+where id = (select id from people_view where name = 'תומר גל');
+
+do $t$ begin
+  insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
+  values ((select id from trainings limit 1), 'האמר', '1234567',
+          (select id from people_view where name = 'תומר גל'), 6, '05:30', 91);
+  raise notice '✅  108  נהג עם רישיון בתוקף שובץ';
+exception when others then
+  raise notice '❌  108  נהג עם רישיון בתוקף נחסם — %', sqlerrm;
+end $t$;
+
+-- ורישיון שפג — גם אם פג רק אתמול
+update people set certs = jsonb_build_object('mildrive', to_char(current_date - 1, 'YYYY-MM-DD'))
+where id = (select id from people_view where name = 'תומר גל');
+
+do $t$ begin
+  insert into vehicles (training_id, type, tz, driver_id, seats, departure, sort)
+  values ((select id from trainings limit 1), 'רוביקון', '7654321',
+          (select id from people_view where name = 'תומר גל'), 5, '05:30', 92);
+  raise notice '❌  109  שובץ נהג עם רישיון שפג — כשל בטיחות';
+exception when others then
+  raise notice '✅  109  רישיון שפג אינו רישיון';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ השלמה ושיבוץ לאימון של צוות אחר ════════
+--
+-- לצרף לוחם לאימון של צוות אחר זו החלטה של מפקד: היא מזיזה כוח אדם ליום שלם
+-- וקובעת אם אימון שהוחמץ נחשב שהושלם. לוחם לא מסדר לעצמו השלמה.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+set role authenticated;
+
+do $t$ begin
+  insert into training_guests (training_id, person_id, makeup_for, note)
+  values ((select id from trainings limit 1),
+          (select id from people_view where name = 'משה רסף'), null, 'תגבור');
+  raise notice '✅  110  מפקד צוות משבץ לוחם מצוות אחר';
+exception when others then
+  raise notice '❌  110  מפקד צוות נחסם משיבוץ — %', sqlerrm;
+end $t$;
+
+select case when exists (select 1 from training_participants((select id from trainings limit 1))
+                          where name = 'משה רסף')
+            then '✅' else '❌' end || '  111  והוא נספר ככוח באימון';
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$
+declare before_n int; after_n int;
+begin
+  select count(*) into before_n from training_guests;
+  begin
+    insert into training_guests (training_id, person_id, makeup_for)
+    values ((select id from trainings limit 1), me_id(), null);
+  exception when others then null;
+  end;
+  select count(*) into after_n from training_guests;
+  if after_n > before_n then
+    raise notice '❌  112  לוחם סידר לעצמו שיבוץ — כשל אבטחה';
+  else
+    raise notice '✅  112  לוחם נחסם מלסדר לעצמו השלמה';
+  end if;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

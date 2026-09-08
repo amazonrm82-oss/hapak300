@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { LogisticsEditor, type LogisticsDraft } from '@/components/dialogs/LogisticsEditor';
 import { Field } from '@/components/ui/bits';
-import { DEFAULT_FREQ, DEFAULT_PICKUP, isOfficer } from '@/lib/core/constants';
+import { DEFAULT_FREQ, DEFAULT_PICKUP } from '@/lib/core/constants';
 import { addDays, weekStart } from '@/lib/core/dates';
 import { defaultLogistics } from '@/lib/core/defaults';
 import { roleLabel } from '@/lib/core/permissions';
@@ -45,6 +45,7 @@ const proposeLogistics = (
   teamId: TrainingTeam,
   start: string,
   location: string,
+  date: string,
 ): LogisticsDraft =>
   defaultLogistics(
     topicId === '__new' ? '' : topicId,
@@ -55,6 +56,7 @@ const proposeLogistics = (
     Object.values(db.teams)
       .filter((t) => t.attends_all)
       .map((t) => t.id),
+    date,
   );
 
 /** Every field the unit made mandatory before a training may be published. */
@@ -104,11 +106,11 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
   // A new training gets a live proposal, refreshed only when one of the four
   // inputs it depends on changes; an existing training keeps its own logistics,
   // edited on the training's logistics tab.
-  const inputs = f ? [f.topic_id, f.team_id, f.start, f.location].join('|') : '';
+  const inputs = f ? [f.topic_id, f.team_id, f.start, f.location, f.date].join('|') : '';
   useEffect(() => {
     if (!open || !db || training || logiTouched || !inputs) return;
-    const [topic, team, start, location] = inputs.split('|');
-    setLogi(proposeLogistics(db, topic, team as TrainingTeam, start, location));
+    const [topic, team, start, location, date] = inputs.split('|');
+    setLogi(proposeLogistics(db, topic, team as TrainingTeam, start, location, date));
   }, [open, db, training, logiTouched, inputs]);
 
   if (!open || !db || !user || !f) return null;
@@ -127,23 +129,12 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
   };
 
   const people = db.people.filter((p) => p.status === 'active');
-  // Certified instructors first, then everyone else who could be asked to run a
-  // station — anyone on a team, and the HQ staff, who belong to no team but do
-  // instruct. Leaving the staff out made the unit's own leadership the only
-  // people who could not be named instructor of a training.
-  const instructorOpts = [
-    ...people.filter((p) => p.is_instructor),
-    ...people.filter((p) => !p.is_instructor),
-  ];
-  // Command of a training follows the commission: any officer may hold it,
-  // alongside the posts that carry it regardless of rank.
+  // Only a certified instructor may be named instructor of a training — the
+  // flag is what makes someone one, whether or not they belong to a team.
+  const instructorOpts = people.filter((p) => p.is_instructor);
+  // Command of a training is a team commander's and above.
   const commanderOpts = people.filter(
-    (p) =>
-      p.is_team_commander ||
-      p.role === 'קמב״צ' ||
-      p.is_hapak_commander ||
-      p.is_admin ||
-      isOfficer(p.rank),
+    (p) => p.is_team_commander || p.role === 'קמב״צ' || p.is_hapak_commander || p.is_admin,
   );
 
   async function save() {
@@ -312,7 +303,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
           }}
           onReset={() => {
             setLogiTouched(false);
-            setLogi(proposeLogistics(db, f.topic_id, f.team_id, f.start, f.location));
+            setLogi(proposeLogistics(db, f.topic_id, f.team_id, f.start, f.location, f.date));
           }}
         />
       )}

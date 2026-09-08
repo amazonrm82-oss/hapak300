@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
 import { suggestSubstitute } from '@/lib/core/alerts';
-import { isOfficer } from '@/lib/core/constants';
 import { roleLabel } from '@/lib/core/permissions';
 import { fullName, topicName, trainingTitle } from '@/lib/core/selectors';
 import type { InviteRole, TrainingFull } from '@/lib/core/types';
@@ -38,18 +37,13 @@ export function InviteDialog({ training, role, onClose }: Props) {
   if (!db || !training || !role) return null;
 
   const people = db.people.filter((p) => p.status === 'active');
-  // the same two lists as the training form: the HQ staff instruct although
-  // they sit on no team, and command of a training follows the commission
+  // the same two lists as the training form: instructing takes the flag,
+  // commanding a training takes a team commander and above
   const candidates =
     role === 'instructor'
-      ? people
+      ? people.filter((p) => p.is_instructor)
       : people.filter(
-          (p) =>
-            p.is_team_commander ||
-            p.role === 'קמב״צ' ||
-            p.is_hapak_commander ||
-            p.is_admin ||
-            isOfficer(p.rank),
+          (p) => p.is_team_commander || p.role === 'קמב״צ' || p.is_hapak_commander || p.is_admin,
         );
 
   async function send() {

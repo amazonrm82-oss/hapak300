@@ -1,4 +1,4 @@
-import { CERT_GATED_TOPICS, CERT_TYPES } from './constants';
+import { CERT_GATED_TOPICS, CERT_TYPES, DRIVING_CERTS } from './constants';
 import { daysBetween, fmtFull, stampToMs } from './dates';
 import {
   attendanceStats,
@@ -16,6 +16,21 @@ export function certStatus(p: Person, type: CertType, today: string, alertDays: 
   if (!exp) return 'none';
   const d = daysBetween(today, exp);
   return d < 0 ? 'expired' : d <= (alertDays || 30) ? 'soon' : 'ok';
+}
+
+/**
+ * May this person be put behind the wheel today?
+ *
+ * נהיגה מבצעית or נהג רכב צבאי, in date. A licence that expired yesterday is
+ * not a licence — this is the one certification the system refuses on rather
+ * than warns about, because the consequence of getting it wrong is a fighter
+ * driving a military vehicle without being licensed for it.
+ */
+export function canDrive(p: Person, today: string): boolean {
+  return DRIVING_CERTS.some((k) => {
+    const exp = p.certs?.[k];
+    return !!exp && daysBetween(today, exp) >= 0;
+  });
 }
 
 export interface CertAlert {

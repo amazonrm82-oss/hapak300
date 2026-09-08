@@ -73,6 +73,17 @@ const text = () => page.locator('body').innerText();
 const has = async (s) => (await text()).includes(s);
 const settle = (ms = 700) => page.waitForTimeout(ms);
 
+/**
+ * The attendance tab, addressed by its own label.
+ *
+ * "נוכחות" on its own also matches the "סימון נוכחות" button above the tabs,
+ * which opens a dialog instead of switching tabs — the tab carries a count.
+ */
+const attendanceTab = async () => {
+  await page.locator('button').filter({ hasText: /^נוכחות \d+\/\d+$/ }).first().click();
+  await page.waitForTimeout(700);
+};
+
 /** Clicks the first button whose label contains `label`. */
 async function click(label, nth = 0) {
   await page.locator(`button:has-text("${label}"), a:has-text("${label}")`).nth(nth).click();
@@ -146,6 +157,11 @@ try {
   // the quick-add row is a set of labelled fields, so address them by label
   const byLabel = (label) =>
     page.locator(`.field:has(label:text-is("${label}")) input, .field:has(label:text-is("${label}")) select`).first();
+  const inDialog = (label) =>
+    page
+      .locator('[role="dialog"]')
+      .locator(`.field:has(label:text-is("${label}")) input, .field:has(label:text-is("${label}")) select`)
+      .first();
   await byLabel('שם מלא').fill('דוד בדיקה');
   await byLabel('מספר אישי').fill('7654321');
   // pick סדיר in the team selector of the quick-add row
@@ -158,15 +174,19 @@ try {
   const roleOptions = (await byLabel('תפקיד').locator('option').allInnerTexts()).join(' | ');
   check('רס״פ וסמל צוות מופיעים ברשימת התפקידים', roleOptions.includes('רס״פ') && roleOptions.includes('סמל צוות'));
 
-  // a second fighter to be the training's instructor: the plain fighter must
-  // stay plain for the checks at the end to mean anything. He carries one of
-  // the new roles, so the round trip through the database is checked too.
-  await byLabel('שם מלא').fill('אבי מדריך');
-  await byLabel('מספר אישי').fill('7654322');
-  await byLabel('תפקיד').selectOption('סמל צוות');
-  await byLabel('צוות').selectOption('a');
-  await click('הוסף');
-  await settle(1500);
+  // A second fighter, added through the full form because only there can he be
+  // marked an instructor — and only a marked instructor may be named instructor
+  // of a training. He carries one of the new roles too, so the round trip of
+  // that field through the database is checked.
+  await click('הוספת לוחם');
+  await settle(900);
+  await inDialog('שם מלא').fill('אבי מדריך');
+  await inDialog('מספר אישי (7 ספרות)').fill('7654322');
+  await inDialog('תפקיד בכוח').selectOption('סמל צוות');
+  await inDialog('צוות').selectOption('a');
+  await page.locator('label:has-text("ניתן להזמין להדרכה") input[type="checkbox"]').check();
+  await click('שמירה');
+  await settle(1800);
   check('ותפקיד חדש נשמר ומוצג ברשימת הכוח', await has('סמל צוות'));
 
   // and an officer holding no command post, to check that the commission alone
@@ -216,14 +236,17 @@ try {
       .getAttribute('value');
     await select.selectOption(value);
   };
-  // who each list offers: the HQ staff sit on no team but do instruct, and an
-  // officer may command a training whether or not he holds a command post
+  // who each list offers: instructing takes the flag, and commanding a training
+  // takes a team commander and above — a commission on its own is not enough
   const optionsOf = async (fieldLabel) =>
     byLabel(fieldLabel).locator('option').allInnerTexts();
   const instructorNames = (await optionsOf('מדריך')).join(' | ');
   const commanderNames = (await optionsOf('מפקד אימון')).join(' | ');
-  check('המפקדה מוצעת כמדריכה למרות שאינה בצוות', instructorNames.includes('ישראל קדוש'));
-  check('וקצין ללא תפקיד פיקודי מוצע כמפקד אימון', commanderNames.includes('רון קצין'));
+  check(
+    'רק מוסמך מוצע כמדריך',
+    instructorNames.includes('אבי מדריך') && !instructorNames.includes('רון קצין'),
+  );
+  check('וקצין ללא תפקיד פיקודי אינו מוצע כמפקד אימון', !commanderNames.includes('רון קצין'));
 
   await pickPerson('מפקד אימון', 'זזון');
   await pickPerson('מדריך', 'אבי מדריך');
@@ -240,6 +263,19 @@ try {
   if (created) {
     trainingUrl = page.url();
     check('מסך האימון מציג לשונית מקצים', await has('מקצים'));
+
+    // Only a fighter marked present or late is measured, so the commander marks
+    // the force first — the same order the day actually happens in.
+    await attendanceTab();
+    await settle(1000);
+    const davidRow = page.locator('tbody tr').filter({ hasText: 'דוד בדיקה' }).first();
+    await davidRow.locator('button:has-text("עדכון")').click();
+    await settle(800);
+    await page.locator('button:text-is("מגיע")').first().click();
+    await settle(400);
+    await click('שמירה');
+    await settle(1500);
+    check('המפקד סימן את הלוחם כנוכח', (await davidRow.innerText()).includes('מגיע'));
 
     // ── drills ──
     await click('מקצים');
@@ -281,7 +317,7 @@ try {
     // ── attendance ──
     await page.goto(trainingUrl, { waitUntil: 'networkidle' });
     await settle(1200);
-    await click('נוכחות');
+    await attendanceTab();
     await settle(1000);
     check('לשונית הנוכחות מציגה את הכוח', await has('דוד בדיקה'));
     check('ולוחם סדיר מופיע באימון של צוות א׳', await has('דוד בדיקה'));
@@ -363,6 +399,9 @@ try {
   await settle(1500);
   check('לוחם רגיל נכנס למערכת בקוד שבחר', !page.url().includes('/login'));
 
+  // his commander already marked him, so there is nothing left to ask him
+  check('ואינו נשאל שוב על אימון שכבר סומן עבורו', !(await has('נקבע לך אימון')));
+
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
   await settle(1200);
   const canCreate = await page.locator('button:has-text("אימון חדש")').count();
@@ -412,6 +451,13 @@ try {
   await page.waitForURL(/\/(schedule|my)/, { timeout: 15000 }).catch(() => {});
   await settle(1500);
   check('סמל צוות נכנס למערכת', !page.url().includes('/login'));
+
+  // nobody has answered for him, and a training was published to his team —
+  // so the app asks on the way in, which is the point of the prompt
+  check('והמערכת שואלת אותו אם הוא מגיע לאימון', await has('נקבע לך אימון'));
+  await page.locator('button:text-is("מגיע")').first().click();
+  await settle(1800);
+  check('ותשובתו נשמרת', !(await has('נקבע לך אימון')));
 
   await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
   await settle(1500);

@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Avatar, Tag } from '@/components/ui/bits';
 import { trainingAlerts } from '@/lib/core/alerts';
+import { MakeupDialog } from '@/components/dialogs/MakeupDialog';
 import { STATUS_LABEL } from '@/lib/core/constants';
 import { fmtShort } from '@/lib/core/dates';
 import { permsFor } from '@/lib/core/permissions';
@@ -11,7 +13,7 @@ import {
   participants,
   personById,
 } from '@/lib/core/selectors';
-import type { TrainingFull } from '@/lib/core/types';
+import type { Person, TrainingFull } from '@/lib/core/types';
 import {
   approveAttendance,
   reopenAttendance,
@@ -33,6 +35,10 @@ export function AttendanceTab({
   onEditPerson: (personId: string) => void;
 }) {
   const { db, user, today, now, toast, refresh } = useApp();
+  // whom this fighter is being sent to make the training up in, or whom to
+  // attach to this training — both go through the same dialog
+  const [makeupFor, setMakeupFor] = useState<Person | null>(null);
+  const [attaching, setAttaching] = useState(false);
   if (!db || !user) return null;
 
   const perms = permsFor(db, user, t);
@@ -43,6 +49,11 @@ export function AttendanceTab({
   const alerts = perms.seesStats ? trainingAlerts(db, t, today, now) : [];
   const min = t.team_id === 'joint' ? db.settings.min_attendance * 2 : db.settings.min_attendance;
   const lastApproval = t.approval_log[t.approval_log.length - 1];
+  const guestIds = new Set((t.guests ?? []).map((g) => g.person_id));
+  // the training a fighter was sent to, to make this one up
+  const makeupIn = (pid: string) =>
+    db.trainings.find((x) => x.guests?.some((g) => g.person_id === pid && g.makeup_for === t.id)) ??
+    null;
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -72,6 +83,11 @@ export function AttendanceTab({
           {fmtShort(t.date)} {t.start}
         </span>
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {perms.canGuest && t.status !== 'cancelled' && (
+            <button className="btn btn-secondary" onClick={() => setAttaching(true)}>
+              שיבוץ מצוות אחר
+            </button>
+          )}
           {perms.canSummarize && !t.trainer_summarized && t.status !== 'cancelled' && (
             <button
               className="btn btn-secondary"
@@ -150,6 +166,11 @@ export function AttendanceTab({
                           אני
                         </Tag>
                       )}
+                      {guestIds.has(p.id) && (
+                        <Tag kind="accent" style={{ fontSize: 10 }}>
+                          {t.guests.find((g) => g.person_id === p.id)?.makeup_for ? 'השלמה' : 'מצוות אחר'}
+                        </Tag>
+                      )}
                     </span>
                   </td>
                   <td style={{ color: 'var(--color-neutral-400)' }}>{p.role}</td>
@@ -224,6 +245,27 @@ export function AttendanceTab({
                         עדכון
                       </button>
                     )}
+                    {/* whoever was not there can be sent to make it up, and
+                        until he is, the training scores him zero once closed */}
+                    {perms.canGuest &&
+                      !guestIds.has(p.id) &&
+                      a?.status !== 'coming' &&
+                      a?.status !== 'late' &&
+                      t.status !== 'cancelled' &&
+                      (makeupIn(p.id) ? (
+                        <span style={{ fontSize: 11.5, color: 'var(--color-accent-300)' }}>
+                          {' '}
+                          משלים ב-{fmtShort(makeupIn(p.id)!.date)}
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 12, padding: '3px 8px' }}
+                          onClick={() => setMakeupFor(p)}
+                        >
+                          השלמה
+                        </button>
+                      ))}
                   </td>
                 </tr>
               );
@@ -231,6 +273,16 @@ export function AttendanceTab({
           </tbody>
         </table>
       </div>
+
+      <MakeupDialog
+        missed={makeupFor ? t : null}
+        into={attaching ? t : null}
+        person={makeupFor}
+        onClose={() => {
+          setMakeupFor(null);
+          setAttaching(false);
+        }}
+      />
 
       {!perms.seesList && (
         <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>

@@ -258,6 +258,18 @@ export interface Training {
 }
 
 /** A training with everything hanging off it — what the screens and rules operate on. */
+/**
+ * A fighter attached to a training that is not his team's — either making up
+ * one he missed, or lent to another force for the day.
+ */
+export interface TrainingGuest {
+  person_id: string;
+  /** The training this stands in for, when it is a makeup. */
+  makeup_for: string | null;
+  added_by: string | null;
+  note: string;
+}
+
 export interface TrainingFull extends Training {
   day_blocks: DayBlock[];
   attendance: Record<string, Attendance>;
@@ -269,6 +281,7 @@ export interface TrainingFull extends Training {
   feedback: Record<string, Feedback>;
   photos: Photo[];
   drills: Drill[];
+  guests: TrainingGuest[];
   approval_log: ApprovalEntry[];
 }
 

@@ -55,16 +55,6 @@ export const RANK_FULL: Record<string, string> = {
 
 export const RANK_ORDER: Record<string, number> = Object.fromEntries(RANKS.map((r, i) => [r, i]));
 
-/**
- * The officer ranks — everything from סג״ם upwards, which is the block at the
- * head of `RANKS`. Taken from the list itself rather than written out again, so
- * a rank added to the list cannot fall out of step with this.
- */
-export const OFFICER_RANKS: readonly string[] = RANKS.slice(0, RANKS.indexOf('סג״ם') + 1);
-
-/** An officer may command a training, whatever else they hold in the unit. */
-export const isOfficer = (rank: string): boolean => OFFICER_RANKS.includes(rank);
-
 // The job a person holds in the force. Distinct from the permission flags:
 // "מפקד חפ״ק" here is the post, while the rights that come with it are the
 // `is_hapak_commander` checkbox on the same form.
@@ -191,6 +181,14 @@ export const CERT_TYPES: [CertType, string][] = [
   ['mildrive', 'נהג רכב צבאי'],
   ['medical', 'בדיקות רפואיות'],
 ];
+
+/**
+ * A driver has to hold one of these, in date.
+ *
+ * Unlike the topic gates below, this one blocks: a fighter without a licence in
+ * date is not offered as a driver at all, and the database refuses him too.
+ */
+export const DRIVING_CERTS: readonly CertType[] = ['drive', 'mildrive'];
 
 /** Topics that a personal certification gates — an expired one warns, never blocks. */
 export const CERT_GATED_TOPICS = ['fire', 'drive', 'medic', 'comms'] as const;

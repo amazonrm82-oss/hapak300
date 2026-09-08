@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
+import { canDrive } from '@/lib/core/alerts';
 import { FITNESS_OPTIONS, FOOD_CATALOG } from '@/lib/core/constants';
 import { permsFor } from '@/lib/core/permissions';
 import { fullName, participants, personById } from '@/lib/core/selectors';
@@ -262,14 +263,21 @@ function VehiclesSection({
   fleet: FleetVehicle[];
 }) {
   const [v, setV] = useState({ type: '', tz: '', driver_id: '', seats: '', departure: '' });
-  const drivers = people.filter((p) => p.role === 'נהג');
-  const others = people.filter((p) => p.role !== 'נהג');
+  // A driver needs a licence in date — נהיגה מבצעית or נהג רכב צבאי — and it is
+  // checked against the day of the training, not today: a licence that expires
+  // the week before is not a licence on the morning the convoy leaves.
+  const licensed = people.filter((p) => canDrive(p, t.date));
+  const drivers = licensed.filter((p) => p.role === 'נהג');
+  const others = licensed.filter((p) => p.role !== 'נהג');
+  const unlicensed = people.length - licensed.length;
   const seats = t.vehicles.reduce((s, x) => s + (x.seats || 0), 0);
 
   return (
     <>
       <span style={{ fontSize: 13, color: 'var(--color-neutral-400)' }}>
-        {seats} מקומות ל-{people.length} לוחמים · שיבוץ נהגים ידני על ידי מפקד האימון
+        {seats} מקומות ל-{people.length} לוחמים · שיבוץ נהגים ידני על ידי מפקד האימון ·{' '}
+        {licensed.length} בעלי רישיון בתוקף
+        {unlicensed > 0 ? ` (${unlicensed} ללא נהיגה מבצעית או נהג רכב צבאי בתוקף — אינם ניתנים לשיבוץ)` : ''}
       </span>
       <div style={{ overflowX: 'auto' }}>
         <table className="table" style={{ minWidth: 900 }}>
@@ -482,7 +490,7 @@ function VehiclesSection({
             onChange={(e) => setV((s) => ({ ...s, driver_id: e.target.value }))}
           >
             <option value="">טרם שובץ</option>
-            {people.map((p) => (
+            {licensed.map((p) => (
               <option key={p.id} value={p.id}>
                 {fullName(p)}
               </option>

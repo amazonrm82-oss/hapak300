@@ -61,6 +61,25 @@ async function notify(text: string, to: string[] | null, trainingId: string | nu
   await sb().from('notifications').insert({ text, to, training_id: trainingId });
 }
 
+/**
+ * Asks the server to push whatever is queued, now.
+ *
+ * The scheduled job drains the same queue on its own clock; this is what makes
+ * a training that was just published reach the team's phones straight away. It
+ * is best-effort on purpose — a training that saved correctly must not report a
+ * failure because a push service was slow.
+ */
+async function pushNow(): Promise<void> {
+  try {
+    const { data } = await sb().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch('/api/push/flush', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  } catch {
+    /* the reminder job will send it on its next run */
+  }
+}
+
 const participantIds = (db: Db, t: TrainingFull) => participants(db, t).map((p) => p.id);
 
 /** Team ids that join every training — סדיר, and anything set up like it. */
@@ -109,6 +128,38 @@ export const summarizeAttendance = (tid: string) => rpc('summarize_attendance', 
 
 export const setAttendanceRating = (tid: string, personId: string, rating: number | null) =>
   rpc('set_attendance_rating', { tid, pid: personId, score: rating });
+
+/**
+ * Attaches a fighter to a training that is not his team's.
+ *
+ * With `makeupFor` it stands in for a training he missed: he is scored where he
+ * actually trained, and the missed one stops counting against him. Without it
+ * he is simply lent to the force for the day. Either way it is a commander's
+ * call — the database refuses anyone below a team commander.
+ */
+export async function addGuest(
+  trainingId: string,
+  personId: string,
+  makeupFor: string | null,
+  note = '',
+): Promise<void> {
+  const { error } = await sb()
+    .from('training_guests')
+    .upsert(
+      { training_id: trainingId, person_id: personId, makeup_for: makeupFor, note },
+      { onConflict: 'training_id,person_id' },
+    );
+  check(error);
+}
+
+export async function removeGuest(trainingId: string, personId: string): Promise<void> {
+  const { error } = await sb()
+    .from('training_guests')
+    .delete()
+    .eq('training_id', trainingId)
+    .eq('person_id', personId);
+  check(error);
+}
 
 // ── trainings ──────────────────────────────────────────────────────────────
 
@@ -176,6 +227,7 @@ function draftFor(db: Db, o: {
     db.people,
     o.location,
     attendsAllTeams(db),
+    o.date,
   );
   const logi = {
     gear: o.gear ?? defaults.gear,
@@ -240,6 +292,8 @@ export async function createTraining(db: Db, user: Person, f: TrainingForm): Pro
   const { data, error } = await sb().rpc('create_trainings', { drafts: [draft], replace_existing: false });
   check(error);
   const id = (data as string[])?.[0];
+
+  void pushNow();
 
   // the invitations go out from here so the wording matches the prototype
   [f.instructor_id, f.commander_id]

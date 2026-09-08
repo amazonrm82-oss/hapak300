@@ -47,6 +47,7 @@ export async function loadDb(): Promise<Db> {
     periods,
     drills,
     drillResults,
+    guests,
   ] = await Promise.all([
     sb.from('settings').select('*').single(),
     sb.from('teams').select('*'),
@@ -74,6 +75,7 @@ export async function loadDb(): Promise<Db> {
     sb.from('periods').select('*').order('closed_at', { ascending: false }),
     sb.from('drills').select('*').order('sort'),
     sb.from('drill_results').select('*'),
+    sb.from('training_guests').select('*'),
   ]);
 
   const firstError = [settings, teams, topics, people, trainings].find((r) => r.error)?.error;
@@ -99,6 +101,7 @@ export async function loadDb(): Promise<Db> {
   const fbBy = byTraining(feedback.data as never[]);
   const photoBy = byTraining(photos.data as never[]);
   const drillBy = byTraining(drills.data as never[]);
+  const guestBy = byTraining(guests.data as never[]);
 
   // results hang off the drill, not the training, so they are grouped once here
   const resultsByDrill = new Map<string, Record<string, DrillResult>>();
@@ -180,6 +183,7 @@ export async function loadDb(): Promise<Db> {
       created_at: t.created_at as string,
       updated_at: t.updated_at as string,
       day_blocks: (blocksBy.get(id) ?? []) as TrainingFull['day_blocks'],
+      guests: (guestBy.get(id) ?? []) as TrainingFull['guests'],
       attendance: attMap,
       gear: (gearBy.get(id) ?? []) as TrainingFull['gear'],
       vehicles: (vehBy.get(id) ?? []) as TrainingFull['vehicles'],

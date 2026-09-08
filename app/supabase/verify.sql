@@ -76,7 +76,12 @@ with checks(sort, patch, what, ok) as (values
               and qual like '%is_rasap%')),
   (23, '05', 'וסמל הצוות רואה את מספר הנשק שהוא רושם',
    exists (select 1 from pg_views
-            where viewname = 'people_view' and definition like '%is_sergeant%'))
+            where viewname = 'people_view' and definition like '%is_sergeant%')),
+  (24, '05', 'נהג חייב רישיון נהיגה בתוקף',
+   exists (select 1 from pg_trigger
+            where tgname = 'vehicles_driver_guard' and not tgisinternal)),
+  (25, '05', 'השלמות ושיבוץ לאימון של צוות אחר',
+   to_regclass('public.training_guests') is not null)
 )
 
 select
@@ -98,6 +103,9 @@ select case
    and (select count(*) from pg_policies
          where tablename = 'fleet' and policyname = 'fleet_write'
            and qual like '%is_rasap%') = 1
+   and to_regclass('public.training_guests') is not null
+   and exists (select 1 from pg_trigger
+                where tgname = 'vehicles_driver_guard' and not tgisinternal)
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

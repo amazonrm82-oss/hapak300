@@ -51,8 +51,16 @@ export const statusLabel = (t: Pick<Training, 'status'>) => TRAINING_STATUS[t.st
 /** Everyone rostered to a team who takes part in this training. */
 /** Whose training this is: the rostered team, plus anyone in a team that joins
  *  every training — סדיר trains with א׳ and ב׳ and never on its own. */
-export function participants(db: Db, t: Pick<Training, 'team_id'>): Person[] {
-  return db.people.filter((p) => isRostered(db, p, t.team_id)).sort(rankSort);
+export function participants(
+  db: Db,
+  t: Pick<Training, 'team_id'> & { guests?: { person_id: string }[] },
+): Person[] {
+  // a guest is attached to this training by a commander — making up one he
+  // missed, or lent to the force for the day — and counts like anyone else
+  const guests = new Set((t.guests ?? []).map((g) => g.person_id));
+  return db.people
+    .filter((p) => isRostered(db, p, t.team_id) || (guests.has(p.id) && p.status === 'active'))
+    .sort(rankSort);
 }
 
 /** True when this person takes part in a training held by `teamId`. */

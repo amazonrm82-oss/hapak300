@@ -137,3 +137,116 @@ from people p
 where me_id() is not null or auth.uid() is null;
 
 grant select on people_view to authenticated;
+
+-- ── a driver needs a licence in date ───────────────────────────────────────
+--
+-- Checked against the day of the training, not the day someone edits the row:
+-- a licence that expires the week before is not a licence on the morning the
+-- convoy leaves. This is the one certification that blocks rather than warns.
+
+create or replace function guard_vehicle_driver() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  day date;
+  licensed boolean;
+begin
+  if new.driver_id is null then return new; end if;
+  select t.date into day from trainings t where t.id = new.training_id;
+  if day is null then return new; end if;
+
+  select coalesce(bool_or(
+           p.certs ? k
+           and (p.certs->>k) ~ '^\d{4}-\d{2}-\d{2}$'
+           and (p.certs->>k)::date >= day), false)
+    into licensed
+    from people p
+    cross join unnest(array['drive', 'mildrive']) as k
+   where p.id = new.driver_id;
+
+  if not licensed then
+    raise exception 'נהג חייב נהיגה מבצעית או נהג רכב צבאי בתוקף ליום האימון';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists vehicles_driver_guard on vehicles;
+create trigger vehicles_driver_guard before insert or update on vehicles
+  for each row execute function guard_vehicle_driver();
+
+-- ── הגעה, ציון, והשלמה ─────────────────────────────────────────────────────
+--
+-- Two facts the system kept apart until now: who was at a training, and who
+-- was scored in it. A fighter who did not show up was simply missing from the
+-- scores, which reads as "not measured" rather than "did not train" — and the
+-- team average quietly improved every time somebody stayed home.
+--
+-- From here on, the roster of a training is the people marked present or late.
+-- Whoever was rostered and did not attend is scored 0 — but only once the
+-- training is closed, so that a training still ahead shows nobody a zero it has
+-- not earned yet. And a fighter can make it up: a team commander (and above)
+-- puts him into another team's training, and that training stands in for the
+-- one he missed.
+
+create table if not exists training_guests (
+  training_id uuid not null references trainings (id) on delete cascade,
+  person_id   uuid not null references people (id) on delete cascade,
+  -- the training this makes up for; null when the fighter is simply attached
+  -- to another team's training for the day
+  makeup_for  uuid references trainings (id) on delete set null,
+  added_by    uuid references people (id) on delete set null,
+  note        text not null default '',
+  created_at  timestamptz not null default now(),
+  primary key (training_id, person_id)
+);
+
+create index if not exists training_guests_person_idx on training_guests (person_id);
+create index if not exists training_guests_makeup_idx on training_guests (makeup_for);
+
+comment on table training_guests is
+  'לוחם שמשובץ לאימון של צוות אחר — בהשלמה על אימון שהחמיץ, או כתגבור';
+
+alter table training_guests enable row level security;
+
+drop policy if exists guests_read on training_guests;
+create policy guests_read on training_guests for select to authenticated
+  using (me_id() is not null);
+
+-- Attaching someone to another team's training is a commander's call: it moves
+-- a fighter between forces for a day and decides whether a missed training is
+-- made good. A fighter cannot arrange his own makeup.
+drop policy if exists guests_write on training_guests;
+create policy guests_write on training_guests for all to authenticated
+  using (is_admin() or is_team_cmd())
+  with check (is_admin() or is_team_cmd());
+
+revoke all on training_guests from authenticated, anon;
+grant select, insert, update, delete on training_guests to authenticated;
+
+-- guests count as participants: for the roster, the food, the seats and the
+-- policies that decide who may see and mark attendance
+create or replace function training_participants(tid uuid)
+returns setof people
+language sql stable security definer set search_path = public as $$
+  select p.* from people p, trainings t
+  where t.id = tid and p.status = 'active' and p.team_id is not null
+    and (t.team_id = 'joint'
+         or p.team_id::text = t.team_id::text
+         or exists (select 1 from teams tm where tm.id = p.team_id and tm.attends_all))
+  union
+  select p.* from people p
+   join training_guests g on g.person_id = p.id
+  where g.training_id = tid and p.status = 'active'
+$$;
+
+create or replace function is_participant(tid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from trainings t
+    where t.id = tid
+      and (t.team_id = 'joint' or t.team_id::text = my_team()::text
+           or t.instructor_id = me_id() or t.commander_id = me_id()
+           or exists (select 1 from teams tm where tm.id = my_team() and tm.attends_all))
+  ) or exists (
+    select 1 from training_guests g where g.training_id = tid and g.person_id = me_id()
+  )
+$$;

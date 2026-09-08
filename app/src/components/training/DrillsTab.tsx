@@ -11,6 +11,7 @@ import {
   scoresFor,
   trainingScore,
 } from '@/lib/core/drills';
+import { fmtShort } from '@/lib/core/dates';
 import { drillsHTML, printHTML } from '@/lib/core/exports';
 import { permsFor } from '@/lib/core/permissions';
 import { fullName, participants } from '@/lib/core/selectors';
@@ -63,6 +64,10 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
   const canGrade = perms.isAdmin || perms.isTrainCmd || perms.canApprove;
   const roster = participants(db, t);
   const rows = scoresFor(db, t);
+  // Only those who were actually there are measured. Recording a result for
+  // someone who did not turn up would put a number on a thing that never
+  // happened; his line is decided by whether he makes the training up.
+  const measured = rows.filter((r) => r.state === 'trained').map((r) => r.person);
   const total = trainingScore(db, t);
   const mine = rows.find((r) => r.person.id === user.id);
 
@@ -221,7 +226,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
                   </span>
                 </button>
                 <span className="tabnum" style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>
-                  {recorded}/{roster.length} נרשמו
+                  {recorded}/{measured.length} נרשמו
                 </span>
                 {canEdit && (
                   <>
@@ -244,7 +249,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
               {open && (
                 <ResultsTable
                   drill={d}
-                  roster={perms.seesList ? roster : roster.filter((p) => p.id === user.id)}
+                  roster={perms.seesList ? measured : measured.filter((p) => p.id === user.id)}
                   canEdit={canEdit}
                   busy={busy}
                   onSave={(personId, v) =>
@@ -262,8 +267,9 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
       {perms.seesList && t.drills.length > 0 && (
         <SectionCard title="ציון לכל לוחם">
           <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)', lineHeight: 1.6 }}>
-            ציון המקצים הוא ממוצע משוקלל של המקצים שהלוחם השתתף בהם. ציון המפקד (1–10) הוא שיקול
-            דעת נפרד, ונשמר גם בנוכחות של האימון.
+            ציון המקצים הוא ממוצע משוקלל של המקצים שהלוחם השתתף בהם — ורק מי שסומן נוכח או מאחר
+            נמדד. מי שלא נכח מקבל 0 ברגע שהאימון נסגר, אלא אם מפקד צוות שיבץ לו השלמה באימון אחר.
+            ציון המפקד (1–10) הוא שיקול דעת נפרד, ונשמר גם בנוכחות של האימון.
           </span>
           <div style={{ overflowX: 'auto' }}>
             <table className="table" style={{ minWidth: 560 }}>
@@ -273,6 +279,7 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
                   <th>תפקיד</th>
                   <th>מקצים</th>
                   <th>ציון מקצים</th>
+                  <th>הערה</th>
                   <th>ציון מפקד (1–10)</th>
                 </tr>
               </thead>
@@ -288,6 +295,15 @@ export function DrillsTab({ training: t }: { training: TrainingFull }) {
                     </td>
                     <td className="tabnum" style={{ color: SCORE_COLOR[scoreTone(r.score)] }}>
                       {r.score === null ? '—' : r.score.toFixed(1)}
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>
+                      {r.state === 'trained'
+                        ? ''
+                        : r.state === 'makeup'
+                          ? `הושלם ב-${r.makeupIn ? fmtShort(r.makeupIn.date) : 'אימון אחר'}`
+                          : r.state === 'missed'
+                            ? 'לא נכח — ללא השלמה'
+                            : 'לא נכח — טרם הושלם'}
                     </td>
                     <td>
                       <select
