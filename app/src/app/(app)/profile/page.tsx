@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { KitDialog } from '@/components/dialogs/KitDialog';
 import { PersonDialog } from '@/components/dialogs/PersonDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
@@ -94,6 +94,19 @@ export default function ProfilePage() {
                 כשירות אישית · {score.toFixed(1)}/10 · {r.note}
               </span>
               <ScoreBar score={score} />
+              {user.team_id && r.parts.length > 1 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '3px 8px', fontSize: 11.5 }}>
+                  {r.parts.map((part) => (
+                    <Fragment key={part.label}>
+                      <Muted>{part.label}</Muted>
+                      <span style={{ color: 'var(--color-neutral-600)' }}>
+                        {Math.round((100 * part.w) / r.parts.reduce((s, x) => s + x.w, 0))}%
+                      </span>
+                      <span className="tabnum">{part.v.toFixed(1)}</span>
+                    </Fragment>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -291,6 +291,19 @@ try {
   await settle(1400);
   check('מסך הפרופיל מציג את הפרטים והיציאה', (await has('יציאה')) && (await has('עריכת פרטים')));
 
+  // ── what the readiness number is made of ──
+  // The legend is the only place a commander can read the formula, so it is
+  // checked against the four parts the code actually weighs.
+  await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
+  await settle(1400);
+  check(
+    'הכשירות בנויה מנוכחות, ציון באימונים, ציון המפקד ודירוג המפקד',
+    (await has('דירוג מפקד')) &&
+      (await has('נוכחות מאושרת')) &&
+      (await has('ציון באימונים')) &&
+      (await has('ציון המפקד לאימון')),
+  );
+
   // ── closing the period: the last thing, because nothing is the same after ──
   await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
   await settle(1400);

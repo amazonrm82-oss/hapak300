@@ -64,44 +64,51 @@ function makeupFor(db: Db, t: TrainingFull, personId: string): TrainingFull | nu
   );
 }
 
+/**
+ * One fighter's score for one training.
+ *
+ * Split out of `scoresFor` so readiness can ask about a single person without
+ * scoring the whole roster — it asks once per fighter per finished training,
+ * and the roster-wide version would turn that into a square.
+ */
+export function scoreOne(db: Db, t: TrainingFull, person: Person): PersonScore {
+  let weighted = 0;
+  let weight = 0;
+  let done = 0;
+
+  for (const drill of t.drills) {
+    const s = resultScore(drill, drill.results[person.id]);
+    if (s === null) continue;
+    weighted += s * drill.weight;
+    weight += drill.weight;
+    done++;
+  }
+
+  const here = attended(t, person.id) || (t.guests ?? []).some((g) => g.person_id === person.id);
+  const made = here ? null : makeupFor(db, t, person.id);
+  const state: ScoreState = here
+    ? 'trained'
+    : made
+      ? 'makeup'
+      : t.status === 'done'
+        ? 'missed'
+        : 'pending';
+
+  const measured = weight > 0 ? Math.round((100 * weighted) / weight) / 100 : null;
+
+  return {
+    person,
+    score: state === 'missed' ? 0 : state === 'trained' ? measured : null,
+    done,
+    total: t.drills.length,
+    state,
+    makeupIn: made,
+  };
+}
+
 /** Every participant's score for the training, in roster order. */
 export function scoresFor(db: Db, t: TrainingFull): PersonScore[] {
-  const guest = new Set((t.guests ?? []).map((g) => g.person_id));
-
-  return participants(db, t).map((person) => {
-    let weighted = 0;
-    let weight = 0;
-    let done = 0;
-
-    for (const drill of t.drills) {
-      const s = resultScore(drill, drill.results[person.id]);
-      if (s === null) continue;
-      weighted += s * drill.weight;
-      weight += drill.weight;
-      done++;
-    }
-
-    const here = attended(t, person.id) || guest.has(person.id);
-    const made = here ? null : makeupFor(db, t, person.id);
-    const state: ScoreState = here
-      ? 'trained'
-      : made
-        ? 'makeup'
-        : t.status === 'done'
-          ? 'missed'
-          : 'pending';
-
-    const measured = weight > 0 ? Math.round((100 * weighted) / weight) / 100 : null;
-
-    return {
-      person,
-      score: state === 'missed' ? 0 : state === 'trained' ? measured : null,
-      done,
-      total: t.drills.length,
-      state,
-      makeupIn: made,
-    };
-  });
+  return participants(db, t).map((person) => scoreOne(db, t, person));
 }
 
 export interface TrainingScore {

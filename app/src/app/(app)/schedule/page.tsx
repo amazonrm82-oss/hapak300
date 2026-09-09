@@ -481,7 +481,7 @@ export default function SchedulePage() {
                 );
               })}
               <span style={{ fontSize: 11, color: 'var(--color-neutral-500)' }}>
-                דירוג מפקד 50% · נוכחות מאושרת 25% · נושאים שהושלמו 25%
+                דירוג מפקד 25% · נוכחות מאושרת 25% · ציון באימונים 25% · ציון המפקד לאימון 25%
               </span>
             </SectionCard>
           )}
