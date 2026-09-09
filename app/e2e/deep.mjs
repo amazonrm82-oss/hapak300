@@ -90,7 +90,7 @@ try {
   mkdirSync(SHOTS, { recursive: true });
   const SCREENS = [
     '/schedule', '/trainings', '/teams', '/logistics', '/calendar',
-    '/archive', '/manage', '/profile', '/my', '/chat', '/install',
+    '/archive', '/manage', '/profile', '/my', '/chat', '/install', '/npak',
   ];
   let shot = 0;
   for (const path of SCREENS) {

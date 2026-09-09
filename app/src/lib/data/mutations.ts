@@ -1158,7 +1158,7 @@ export async function closePeriod(name: string, start: string, note: string): Pr
 export async function issueNpak(
   db: Db,
   user: Person,
-  trainingId: string,
+  trainingId: string | null,
   rows: NpakRow[],
 ): Promise<Npak> {
   if (!rows.length) throw new Error('אין רכבים בנפ״ק');

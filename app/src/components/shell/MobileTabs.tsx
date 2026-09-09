@@ -45,6 +45,14 @@ export function MobileTabs() {
 
   const moreItems: [string, string, string][] = [
     ...MORE,
+    // the manifest carries personal numbers, so it is a commander's screen
+    ...(perms.isAdmin || user?.is_team_commander
+      ? ([['/npak', 'נפ״ק', 'מי נוסע באיזה רכב — לוואטסאפ, ונשמר בארכיון']] as [
+          string,
+          string,
+          string,
+        ][])
+      : []),
     ...(perms.canManagePeriod
       ? ([['/manage', 'ניהול', 'תקופות, תבנית סבב, גיבוי ויומן פעולות']] as [string, string, string][])
       : []),

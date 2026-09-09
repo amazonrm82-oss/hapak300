@@ -402,24 +402,6 @@ try {
     body = await page.locator('body').innerText();
     check('ועכשיו שיש רכב — נדרש נהג שמגיע', body.includes('נהגים מוסמכים'));
 
-    // ── נפ״ק: who rides in which vehicle ──
-    //
-    // The vehicle added just above is the one it seats people into, and the
-    // manifest it produces is kept afterwards exactly as it went out.
-    await click('נפ״ק');
-    await settle(1200);
-    check('לשונית הנפ״ק נפתחת', await has('נפ״ק חדש'));
-    await click('מלא מרכבי האימון');
-    await settle(900);
-    check('ורכבי האימון נכנסים אליו', await has('מקומות'));
-    // seat one fighter next to the driver
-    const seatBtn = page.locator('button').filter({ hasText: 'דוד בדיקה' }).last();
-    if (await seatBtn.count()) await seatBtn.click();
-    await settle(500);
-    await click('נפק ושלח בוואטסאפ');
-    await settle(2600);
-    check('הנפ״ק הוצא ונשמר בהיסטוריה', await has('נפ״קים שהוצאו (1)'), await text().then((x) => x.slice(0, 60)));
-
     // ── the evacuation vehicle comes from the fleet ──
     //
     // With no vehicle on the training the picker used to be empty, with nothing
@@ -561,6 +543,27 @@ try {
     check('בלי התוצאות של הקודם', !(await has('85.0')));
   }
 
+  // ── נפ״ק: a screen of its own ──
+  //
+  // Not part of a training: a convoy is put together on the day, from the
+  // fleet and from the whole force, and what comes out is read at the gate.
+  await page.goto(`${BASE}/npak`, { waitUntil: 'networkidle' });
+  await settle(1400);
+  check('מסך הנפ״ק נפתח', await has('נפ״ק חדש'));
+  check('והוא מציע רכבים מהצי', await has('מהצי:'));
+  await page.locator('button').filter({ hasText: /^\+ .* צ׳ / }).first().click();
+  await settle(700);
+  const npDriver = page.locator('select[aria-label="נהג"]').first();
+  const npOpts = await npDriver.locator('option').allInnerTexts();
+  check('ורק נהג מוסמך מוצע', npOpts.length === 2, npOpts.join(' | '));
+  await npDriver.selectOption({ label: npOpts[1] });
+  await settle(400);
+  await page.locator('button').filter({ hasText: 'דוד בדיקה' }).first().click();
+  await settle(500);
+  await click('נפק ושלח בוואטסאפ');
+  await settle(2600);
+  check('הנפ״ק הוצא ונשמר בארכיון', await has('ארכיון נפ״ק (1)'), await text().then((x) => x.slice(0, 80)));
+
   // ── every screen renders ──
   for (const path of [
     '/schedule',
@@ -572,6 +575,7 @@ try {
     '/manage',
     '/profile',
     '/install',
+    '/npak',
     '/my',
     '/chat',
   ]) {

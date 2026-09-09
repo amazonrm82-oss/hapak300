@@ -269,6 +269,16 @@ export function AppHeader() {
               >
                 הפרופיל שלי
               </Link>
+              {(perms.isAdmin || user.is_team_commander) && (
+                <Link
+                  className="btn btn-secondary"
+                  href="/npak"
+                  style={{ justifyContent: 'flex-start' }}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  נפ״ק
+                </Link>
+              )}
               <Link
                 className="btn btn-secondary"
                 href="/install"

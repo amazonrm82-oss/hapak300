@@ -31,7 +31,7 @@ const check = (l, cond, d) => (cond ? ok(l) : bad(l, d));
 
 const SCREENS = [
   '/schedule', '/trainings', '/teams', '/logistics',
-  '/calendar', '/archive', '/manage', '/profile', '/my', '/chat', '/install',
+  '/calendar', '/archive', '/manage', '/profile', '/my', '/chat', '/install', '/npak',
 ];
 
 /**
