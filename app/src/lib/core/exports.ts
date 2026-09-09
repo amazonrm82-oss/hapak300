@@ -10,7 +10,7 @@ import {
 } from './selectors';
 import { resultScore, scoresFor, trainingScore } from './drills';
 import { ammoUsage } from './ammo';
-import type { Db, Person, TrainingFull } from './types';
+import type { Db, Npak, Person, TrainingFull } from './types';
 
 // Quotes are escaped too: this output is also read inside attributes, and a
 // name or a location is text the unit types, not text we control.
@@ -445,6 +445,33 @@ export function ammoHTML(db: Db, t: TrainingFull): string {
       : '') +
     `<p class="muted">הכמויות מחושבות מהמקצים של האימון: כל כדור שנרשם ללוחם במקצה נספר לנשק האישי שלו.</p>`
   );
+}
+
+// ── נפ״ק: who rides in which vehicle ───────────────────────────────────────
+
+/**
+ * The manifest, in the shape it is read out at the gate.
+ *
+ * Date first, then a block per vehicle: what it is and its registration, who
+ * drives it, and everyone in it by name, personal number and post. It is sent
+ * on WhatsApp, so it is plain text with no table anywhere in it — a table on a
+ * phone is a wall.
+ */
+export function npakText(db: Db, n: Npak): string {
+  const lines = [`נפ״ק — ${db.settings.unit_name}`, fmtFull(n.issued_at.slice(0, 10)), ''];
+
+  n.rows.forEach((r, i) => {
+    lines.push(`${r.type}${r.tz ? ` · צ׳ ${r.tz}` : ''}${r.seats ? ` · ${r.seats} מקומות` : ''}`);
+    lines.push(`נהג: ${r.driver ? `${r.driver.name} · ${r.driver.pn || '—'}` : '— טרם שובץ'}`);
+    r.people.forEach((p, j) => {
+      lines.push(`לוחם ${j + 1}: ${p.name} · ${p.pn || '—'}${p.role ? ` · ${p.role}` : ''}`);
+    });
+    if (i < n.rows.length - 1) lines.push('');
+  });
+
+  const total = n.rows.reduce((s, r) => s + (r.driver ? 1 : 0) + r.people.length, 0);
+  lines.push('', `${n.rows.length} רכבים · ${total} נוסעים`);
+  return lines.join('\n');
 }
 
 // ── צל״ם: the kit each fighter signs for ───────────────────────────────────

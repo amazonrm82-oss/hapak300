@@ -328,7 +328,7 @@ function VehiclesSection({
                     disabled={!canEdit}
                     onChange={(e) => void run(() => setVehicleField(veh.id, 'driver_id', e.target.value))}
                   >
-                    <option value="">טרם שובץ</option>
+                    <option value="">נהג — חובה לשבץ</option>
                     {drivers.map((p) => (
                       <option key={p.id} value={p.id}>
                         {fullName(p)}
@@ -406,8 +406,12 @@ function VehiclesSection({
 
       {canEdit && fleet.filter((x) => x.active).length > 0 && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* one tap per vehicle the unit already registered, צ׳ and all */}
-          <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>הוספה מהצי:</span>
+          {/* One tap per vehicle the unit already registered, צ׳ and all. It
+              fills the row below rather than adding straight away: a vehicle
+              joins a training with a driver, or it does not join it. */}
+          <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
+            בחירה מהצי (ואז שבץ נהג):
+          </span>
           {fleet
             .filter((x) => x.active)
             .map((x) => {
@@ -419,15 +423,13 @@ function VehiclesSection({
                   disabled={taken}
                   style={{ fontSize: 12, minHeight: 32, padding: '4px 10px', opacity: taken ? 0.45 : 1 }}
                   onClick={() =>
-                    void run(() =>
-                      addVehicle(t.id, {
-                        type: x.type,
-                        tz: x.tz,
-                        driver_id: '',
-                        seats: x.seats,
-                        departure: t.departure,
-                      }),
-                    )
+                    setV({
+                      type: x.type,
+                      tz: x.tz,
+                      driver_id: '',
+                      seats: String(x.seats),
+                      departure: t.departure,
+                    })
                   }
                 >
                   {taken ? '✓' : '+'} {x.type} · צ׳ {x.tz}
@@ -514,8 +516,12 @@ function VehiclesSection({
             value={v.departure}
             onChange={(e) => setV((s) => ({ ...s, departure: e.target.value }))}
           />
+          {/* a vehicle with nobody driving it is a vehicle that stays in the
+              yard — the rule is the same one the database enforces */}
           <button
             className="btn btn-secondary"
+            disabled={!v.type || !v.driver_id}
+            title={!v.driver_id ? 'שבץ נהג מוסמך לרכב' : undefined}
             onClick={() =>
               void run(async () => {
                 await addVehicle(t.id, {

@@ -336,33 +336,89 @@ try {
     check('המפקד סימן את הלוחם כנוכח', (await davidRow.innerText()).includes('מגיע'));
     check('והחלון נסגר על אותה לחיצה', (await page.locator('[role="dialog"]').count()) === 0);
 
-    // Now that someone has answered, the alert list is live. The proposal
-    // above put three vehicles on this training, so a driver is owed — and a
-    // guard is not, at any point.
+    // Now that someone has answered, the alert list is live. Nobody in this
+    // unit is marked a driver yet, so the proposal put no vehicle on the
+    // training — and with no vehicle, no driver is owed and no guard ever is.
     let body = await page.locator('body').innerText();
     check('רשימת ההתראות פעילה — חסר חובש', body.includes('אין חובש'));
-    check('ועם רכבים באימון — חסר נהג מוסמך', body.includes('נהגים מוסמכים'));
+    check('ובלי רכב באימון — אין דרישה לנהג', !body.includes('נהגים מוסמכים'));
     check('ומאבטח אינו נדרש', !body.includes('אין מאבטח'), body.match(/.*מאבטח.*/)?.[0]);
 
-    // take the vehicles off, and the driver stops being owed with them
-    await click('לוגיסטיקה ותחמושת');
+    // ── a vehicle needs a driver, and only a licensed one ──
+    //
+    // Mark the officer a driver and give him a licence in date; he is then the
+    // only name the vehicle row will offer, and the only one the database will
+    // accept.
+    await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+    await settle(1200);
+    await click('עריכה');
     await settle(900);
+    const driverBox = page
+      .locator('[role="dialog"] label')
+      .filter({ hasText: 'נהג — ניתן לשבץ כנהג רכב' })
+      .locator('input[type="checkbox"]');
+    if (await driverBox.count()) await driverBox.check();
+    const nextYear = new Date(today.getTime() + 365 * 864e5).toISOString().slice(0, 10);
+    await inDialog('נהיגה מבצעית').fill(nextYear);
+    await click('שמירה');
+    await settle(2200);
+    check('סימון נהג והסמכת נהיגה נשמרו', !(await has('אין לך הרשאה')));
+
+    await page.goto(trainingUrl, { waitUntil: 'networkidle' });
+    await settle(1600);
+    await click('לוגיסטיקה ותחמושת');
+    await settle(1000);
     await page.locator('button').filter({ hasText: /^רכבים \(\d+\)$/ }).first().click();
     await settle(900);
-    for (let i = 0; i < 6; i++) {
-      const remove = page.locator('table').locator('button:text-is("הסר")');
-      if ((await remove.count()) === 0) break;
-      await remove.first().click();
-      await settle(900);
-    }
-    await attendanceTab();
-    await settle(900);
-    body = await page.locator('body').innerText();
+
+    const addRow = page.locator('div').filter({ has: page.locator('input[placeholder="מספר צ׳"]') }).last();
+    await addRow.locator('select').first().selectOption('האמר');
+    await addRow.locator('input[placeholder="מספר צ׳"]').fill('6110001');
+    const addBtn = page.locator('button:has-text("הוסף רכב")').first();
+    check('בלי נהג משובץ אי אפשר להוסיף רכב', await addBtn.isDisabled());
+
+    const driverSel = addRow.locator('select').nth(1);
+    const driverOpts = await driverSel.locator('option').allInnerTexts();
     check(
-      'ובלי רכב באימון — אין דרישה לנהג',
-      !body.includes('נהגים מוסמכים'),
-      body.match(/.*נהגים.*/)?.[0],
+      'ורשימת הנהגים מציעה רק את מי שמוסמך',
+      driverOpts.length === 2 && driverOpts.some((o) => o.includes('רון קצין')),
+      driverOpts.join(' | '),
     );
+    await driverSel.selectOption({ label: driverOpts[1] });
+    await settle(400);
+    check('ומשנבחר נהג — אפשר להוסיף', !(await addBtn.isDisabled()));
+    await addBtn.click();
+    await settle(2200);
+    // the צ׳ lives in an input, so it is read as a value and not as page text
+    check(
+      'הרכב נוסף עם הנהג שלו',
+      (await page.locator('input.tabnum').evaluateAll((els) =>
+        els.some((e) => e.value === '6110001'),
+      )) || (await has('6110001')),
+    );
+
+    await attendanceTab();
+    await settle(1000);
+    body = await page.locator('body').innerText();
+    check('ועכשיו שיש רכב — נדרש נהג שמגיע', body.includes('נהגים מוסמכים'));
+
+    // ── נפ״ק: who rides in which vehicle ──
+    //
+    // The vehicle added just above is the one it seats people into, and the
+    // manifest it produces is kept afterwards exactly as it went out.
+    await click('נפ״ק');
+    await settle(1200);
+    check('לשונית הנפ״ק נפתחת', await has('נפ״ק חדש'));
+    await click('מלא מרכבי האימון');
+    await settle(900);
+    check('ורכבי האימון נכנסים אליו', await has('מקומות'));
+    // seat one fighter next to the driver
+    const seatBtn = page.locator('button').filter({ hasText: 'דוד בדיקה' }).last();
+    if (await seatBtn.count()) await seatBtn.click();
+    await settle(500);
+    await click('נפק ושלח בוואטסאפ');
+    await settle(2600);
+    check('הנפ״ק הוצא ונשמר בהיסטוריה', await has('נפ״קים שהוצאו (1)'), await text().then((x) => x.slice(0, 60)));
 
     // ── the evacuation vehicle comes from the fleet ──
     //

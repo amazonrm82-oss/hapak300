@@ -1274,3 +1274,41 @@ select case when coalesce((select sight_serial from people_view where name = 'ד
             then '✅' else '❌' end || '  139  וצ׳ הכוונת מוסתר מלוחם אחר';
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ נפ״ק ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+insert into npak (training_id, issued_by, rows)
+values (
+  (select id from trainings where location = 'שטח היעדרות'),
+  me_id(),
+  jsonb_build_array(jsonb_build_object(
+    'type','האמר','tz','612345','seats',4,
+    'driver', jsonb_build_object('name','רס״ב שמעון','pn','7241938','role','נהג'),
+    'people', jsonb_build_array(jsonb_build_object('name','סמל בדיקה','pn','7654322','role','קשר'))))
+);
+
+select case when (select count(*) from npak) = 1
+            then '✅' else '❌' end || '  140  נפ״ק נשמר עם הרכב, הנהג והנוסעים';
+
+select case when (select rows->0->'driver'->>'pn' from npak limit 1) = '7241938'
+            then '✅' else '❌' end || '  141  והמספרים האישיים נשמרו כפי שהיו';
+
+-- לוחם רגיל אינו רואה נפ״ק: הוא מלא מספרים אישיים
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+set role authenticated;
+
+select case when (select count(*) from npak) = 0
+            then '✅' else '❌' end || '  142  ולוחם רגיל אינו רואה נפ״ק בכלל';
+
+do $t$ begin
+  insert into npak (training_id, rows) values (null, '[]'::jsonb);
+  raise notice '❌  143  לוחם הוציא נפ״ק — כשל';
+exception when others then
+  raise notice '✅  143  ואינו יכול להוציא אחד';
+end $t$;
+
+reset role; reset request.jwt.claim.sub;

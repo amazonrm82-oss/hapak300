@@ -48,6 +48,7 @@ export async function loadDb(): Promise<Db> {
     drills,
     drillResults,
     guests,
+    npak,
   ] = await Promise.all([
     sb.from('settings').select('*').single(),
     sb.from('teams').select('*'),
@@ -76,6 +77,9 @@ export async function loadDb(): Promise<Db> {
     sb.from('drills').select('*').order('sort'),
     sb.from('drill_results').select('*'),
     sb.from('training_guests').select('*'),
+    // the manifest is readable by commanders only; for anyone else the policy
+    // returns nothing, which is the right answer and not an error
+    sb.from('npak').select('*').order('issued_at', { ascending: false }),
   ]);
 
   const firstError = [settings, teams, topics, people, trainings].find((r) => r.error)?.error;
@@ -261,6 +265,7 @@ export async function loadDb(): Promise<Db> {
     weapons: (weapons.data ?? []).map((r: { name: string }) => r.name),
     locations: (locations.data ?? []).map((r: { name: string }) => r.name),
     fleet: (fleet.data ?? []) as Db['fleet'],
+    npak: (npak.data ?? []) as Db['npak'],
     periods: (periods.data ?? []) as Db['periods'],
     calendar: (calendar.data ?? []) as Db['calendar'],
     notifications: ((notifications.data ?? []) as Record<string, unknown>[]).map((n) => ({

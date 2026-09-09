@@ -117,6 +117,32 @@ function orderFrom(params) {
 
 // ── running a statement as the caller ──────────────────────────────────────
 
+
+/**
+ * Which columns of a table are json or jsonb.
+ *
+ * `pg` sends a JavaScript array to Postgres as an array literal — `{a,b}` —
+ * which is right for a text[] column and nonsense for a jsonb one. PostgREST
+ * knows the difference from the schema; so does this, once per table.
+ */
+const jsonColsCache = new Map();
+async function jsonCols(table) {
+  if (jsonColsCache.has(table)) return jsonColsCache.get(table);
+  const { rows } = await pool.query(
+    `select column_name from information_schema.columns
+      where table_schema = 'public' and table_name = $1 and data_type in ('json', 'jsonb')`,
+    [table],
+  );
+  const set = new Set(rows.map((r) => r.column_name));
+  jsonColsCache.set(table, set);
+  return set;
+}
+
+/** A value on its way into a column, in the form that column expects. */
+const forColumn = (v, isJson) =>
+  isJson && v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
+
+
 async function asCaller(req, fn) {
   const auth = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
   const apikey = req.headers.apikey ?? '';
@@ -370,9 +396,10 @@ const server = createServer(async (req, res) => {
         const list = Array.isArray(body) ? body : [body];
         if (!list.length) return json(res, 201, []);
         const cols = [...new Set(list.flatMap((r) => Object.keys(r)))];
+        const jcols = await jsonCols(table);
         const vals = [];
         const tuples = list.map(
-          (r) => `(${cols.map((c) => `$${vals.push(r[c] ?? null)}`).join(', ')})`,
+          (r) => `(${cols.map((c) => `$${vals.push(forColumn(r[c] ?? null, jcols.has(c)))}`).join(', ')})`,
         );
         const onConflict = url.searchParams.get('on_conflict');
         const upsert = prefer.includes('resolution=merge-duplicates') && onConflict;
@@ -396,7 +423,10 @@ const server = createServer(async (req, res) => {
         // the filter values were pushed first, so rebuild in the right order
         const v2 = [];
         const where2 = whereFrom(params, v2);
-        const setSql = cols.map((c) => `"${c}" = $${v2.push(body[c])}`).join(', ');
+        const jcols2 = await jsonCols(table);
+        const setSql = cols
+          .map((c) => `"${c}" = $${v2.push(forColumn(body[c], jcols2.has(c)))}`)
+          .join(', ');
         const sql = `update "${table}" set ${setSql} ${where2}` +
           (prefer.includes('return=representation') ? ' returning *' : '');
         void sets;

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { statusWord } from '@/components/TrainingCard';
 import { AlertList, ProgressBar, SectionCard, Tag } from '@/components/ui/bits';
-import { inviteOverdue, suggestSubstitute, trainingAlerts } from '@/lib/core/alerts';
+import { canDrive, inviteOverdue, suggestSubstitute, trainingAlerts } from '@/lib/core/alerts';
 import { reminderPreview, weatherEstimate } from '@/lib/core/calendar';
 import { sunTimes } from '@/lib/core/dates';
 import { permsFor } from '@/lib/core/permissions';
@@ -69,6 +69,16 @@ export function OverviewTab({ training: t, onInvite }: Props) {
   // the fleet minus what is already on this training, matched by registration
   const onTraining = new Set(t.vehicles.map((v) => v.tz).filter(Boolean));
   const fleetSpare = db.fleet.filter((x) => x.active && !onTraining.has(x.tz));
+  // Whoever may drive on the day and is not already at a wheel here. A vehicle
+  // added from this screen takes the first of them, and the toast says who.
+  const atWheel = new Set(t.vehicles.map((v) => v.driver_id).filter(Boolean));
+  const freeDriver = db.people.find(
+    (p) =>
+      p.status === 'active' &&
+      (p.is_driver || p.role === 'נהג') &&
+      canDrive(p, t.date) &&
+      !atWheel.has(p.id),
+  );
   const isPart = ps.some((p) => p.id === user.id);
 
   const veh: Record<string, number> = {};
@@ -218,10 +228,14 @@ export function OverviewTab({ training: t, onInvite }: Props) {
                     const pick = val.startsWith('fleet:')
                       ? db.fleet.find((x) => x.id === val.slice(6))
                       : null;
-                    void run(() =>
-                      pick
-                        ? setEvacFromFleet(t.id, pick, t.departure)
-                        : setTrainingField(t.id, 'evac_vehicle_id', val),
+                    void run(
+                      () =>
+                        pick
+                          ? setEvacFromFleet(t.id, pick, t.departure, freeDriver?.id ?? '')
+                          : setTrainingField(t.id, 'evac_vehicle_id', val),
+                      pick && freeDriver
+                        ? `${pick.type} נוסף לאימון · נהג ${fullName(freeDriver)} — אפשר להחליף בלוגיסטיקה`
+                        : undefined,
                     );
                   }}
                 >

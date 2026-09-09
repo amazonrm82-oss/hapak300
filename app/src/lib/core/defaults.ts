@@ -162,10 +162,13 @@ export function defaultVehicles(
   );
   const dep = addMinutes(start, -DEPARTURE_LEAD_MINUTES);
   const types = teamId === 'joint' ? ['האמר', 'האמר', 'האמר', 'רוביקון', 'RZR'] : ['האמר', 'האמר', 'האמר'];
-  return types.map((type, i) => ({
+  // Never propose a vehicle nobody may drive. A row with an empty seat is a row
+  // the commander then has to delete before the training will save, and the
+  // proposal exists to save him work, not to make some.
+  return types.slice(0, drivers.length).map((type, i) => ({
     type,
     tz: '',
-    driver_id: drivers[i]?.id ?? null,
+    driver_id: drivers[i].id,
     seats: type === 'RZR' ? 4 : type === 'רוביקון' ? 5 : 6,
     departure: dep,
     fitness: 'כשיר' as const,

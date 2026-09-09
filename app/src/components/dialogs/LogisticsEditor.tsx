@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import type { NewAmmo, NewFood, NewGear, NewVehicle } from '@/lib/core/defaults';
 import { VehicleTypeSelect } from '@/components/VehicleTypeSelect';
+import { canDrive } from '@/lib/core/alerts';
 import { FITNESS_OPTIONS } from '@/lib/core/constants';
+import { fullName } from '@/lib/core/selectors';
 import type { Db } from '@/lib/core/types';
 
 export interface LogisticsDraft {
@@ -16,6 +18,8 @@ export interface LogisticsDraft {
 interface Props {
   db: Db;
   value: LogisticsDraft;
+  /** The day the training falls on — a licence is checked against it, not today. */
+  date: string;
   onChange: (next: LogisticsDraft) => void;
   onReset: () => void;
 }
@@ -29,10 +33,21 @@ interface Props {
  * is what the whole team gets, and it stays editable later on the training's
  * own logistics tab.
  */
-export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
+export function LogisticsEditor({ db, value, date, onChange, onReset }: Props) {
   const patch = (part: Partial<LogisticsDraft>) => onChange({ ...value, ...part });
 
   const fleet = db.fleet.filter((v) => v.active);
+
+  /**
+   * Who may be put behind a wheel on that day.
+   *
+   * Marked as a driver on his card, and holding נהיגה מבצעית or נהג רכב צבאי in
+   * date on the day of the training. The database refuses anyone else outright,
+   * so offering a wider list here only produces a training that will not save.
+   */
+  const drivers = db.people.filter(
+    (p) => p.status === 'active' && (p.is_driver || p.role === 'נהג') && canDrive(p, date),
+  );
 
   /** Adds one vehicle, inheriting the departure time already in use. */
   const addVehicle = (v: Partial<NewVehicle> & { type: string }) =>
@@ -157,6 +172,21 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
           </span>
         )}
 
+        {/* A vehicle on the list is a vehicle somebody has to drive, and the
+            rule is the same one the database enforces — so it is said here,
+            where it can still be acted on. */}
+        {value.vehicles.length > 0 && drivers.length === 0 && (
+          <span style={{ fontSize: 12, color: 'var(--color-accent-300)' }}>
+            אין אף לוחם שמסומן ״נהג״ עם הסמכת נהיגה בתוקף ליום האימון — סמן נהג בכרטיס
+            האישי שלו והוסף לו הסמכה בתוקף, או הסר את הרכב.
+          </span>
+        )}
+        {value.vehicles.some((v) => v.type && !v.driver_id) && drivers.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--color-accent-300)' }}>
+            לכל רכב חייב להיות נהג משובץ לפני השמירה.
+          </span>
+        )}
+
         {value.vehicles.map((v, i) => (
           <Row key={i} onRemove={() => patch({ vehicles: value.vehicles.filter((_, j) => j !== i) })}>
             <VehicleTypeSelect
@@ -223,15 +253,12 @@ export function LogisticsEditor({ db, value, onChange, onReset }: Props) {
               }
               style={{ width: 150 }}
             >
-              <option value="">נהג — לא שובץ</option>
-              {db.people
-                .filter((p) => p.status === 'active')
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.rank} {p.name}
-                    {p.role === 'נהג' ? ' · נהג' : ''}
-                  </option>
-                ))}
+              <option value="">נהג — חובה לשבץ</option>
+              {drivers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {fullName(p)}
+                </option>
+              ))}
             </select>
             <select
               className="input"

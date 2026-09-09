@@ -165,6 +165,35 @@ export interface FoodRow {
   note: string;
 }
 
+/**
+ * One seat on a נפ״ק, written down as it was at the moment it was issued.
+ *
+ * A name and a personal number, not a reference: a fighter who moves team
+ * tomorrow does not rewrite a manifest that already went out.
+ */
+export interface NpakSeat {
+  name: string;
+  pn: string;
+  role: string;
+}
+
+export interface NpakRow {
+  type: string;
+  tz: string;
+  seats: number;
+  driver: NpakSeat | null;
+  people: NpakSeat[];
+}
+
+/** A manifest that was issued: who rides in which vehicle, and when it was set. */
+export interface Npak {
+  id: string;
+  training_id: string | null;
+  issued_at: string;
+  issued_by: string | null;
+  rows: NpakRow[];
+}
+
 export interface Attachment {
   name: string;
   is_image: boolean;
@@ -351,6 +380,7 @@ export interface Db {
   weapons: string[];
   locations: string[];
   fleet: FleetVehicle[];
+  npak: Npak[];
   periods: ClosedPeriod[];
   calendar: CalendarEvent[];
   notifications: Notification[];

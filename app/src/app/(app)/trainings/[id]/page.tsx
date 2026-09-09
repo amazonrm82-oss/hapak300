@@ -9,6 +9,7 @@ import { useShareOrder } from '@/components/dialogs/TextDialog';
 import { AttendanceTab } from '@/components/training/AttendanceTab';
 import { ChatTab } from '@/components/training/ChatTab';
 import { LogisticsTab } from '@/components/training/LogisticsTab';
+import { NpakTab } from '@/components/training/NpakTab';
 import { OverviewTab } from '@/components/training/OverviewTab';
 import { DrillsTab } from '@/components/training/DrillsTab';
 import { SummaryTab } from '@/components/training/SummaryTab';
@@ -46,7 +47,7 @@ import {
 } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
-type Tab = 'overview' | 'attendance' | 'drills' | 'logistics' | 'chat' | 'summary';
+type Tab = 'overview' | 'attendance' | 'drills' | 'logistics' | 'npak' | 'chat' | 'summary';
 
 export default function TrainingPage({ params }: { params: { id: string } }) {
   const app = useApp();
@@ -94,6 +95,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
     ['attendance', `נוכחות ${st.responded}/${st.total}`],
     ['drills', t.drills.length ? `מקצים (${t.drills.length})` : 'מקצים'],
     ['logistics', 'לוגיסטיקה ותחמושת'],
+    ['npak', db.npak.some((n) => n.training_id === t.id) ? `נפ״ק (${db.npak.filter((n) => n.training_id === t.id).length})` : 'נפ״ק'],
     ['chat', unreadChat ? `צ׳אט (${unreadChat})` : 'צ׳אט'],
     ['summary', 'סיכום'],
   ];
@@ -274,6 +276,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
         <AttendanceTab training={t} onEditPerson={(pid) => setMarkPerson(pid)} />
       )}
       {tab === 'logistics' && <LogisticsTab training={t} />}
+      {tab === 'npak' && <NpakTab training={t} />}
       {tab === 'chat' && <ChatTab training={t} />}
       {tab === 'drills' && <DrillsTab training={t} />}
       {tab === 'summary' && <SummaryTab training={t} />}

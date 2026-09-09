@@ -27,6 +27,8 @@ import type {
   Fitness,
   FleetVehicle,
   InviteRole,
+  Npak,
+  NpakRow,
   Person,
   RotationConfig,
   TeamKey,
@@ -208,6 +210,12 @@ export function validateTrainingForm(f: TrainingForm): string | null {
     return 'שעת התכנסות לא תקינה (HH:MM)';
   if (!f.commander_id || !f.instructor_id) return 'נדרשים מפקד אימון ומדריך';
   if (!f.safety.trim()) return 'נדרשות הוראות בטיחות';
+  // A vehicle on the list is a vehicle that has to be driven. The database
+  // refuses an unlicensed driver; this refuses no driver at all, which is the
+  // same problem discovered at 05:30 instead of now.
+  const noDriver = (f.vehicles ?? []).find((v) => v.type.trim() && !v.driver_id);
+  if (noDriver)
+    return `לרכב ${noDriver.type}${noDriver.tz ? ` צ׳ ${noDriver.tz}` : ''} לא שובץ נהג — לכל רכב באימון חייב להיות נהג`;
   return null;
 }
 
@@ -806,19 +814,27 @@ export async function setTrainingField(
  * the fleet that is not yet on the training is put there, and only then named
  * — rather than being a registration number written on the overview and
  * nowhere else.
+ *
+ * It goes on with a driver, like every other vehicle: the caller passes the
+ * first licensed driver who is not already at a wheel, and says so on screen.
+ * A vehicle nobody may drive is not a vehicle that is coming.
  */
 export async function setEvacFromFleet(
   tid: string,
   f: { type: string; tz: string; seats: number },
   departure: string,
+  driverId: string,
 ): Promise<void> {
+  if (!driverId)
+    throw new Error('אין נהג מוסמך פנוי לרכב הזה — שבץ נהג בלוגיסטיקה, או סמן נהג נוסף');
+
   const { data, error } = await sb()
     .from('vehicles')
     .insert({
       training_id: tid,
       type: f.type,
       tz: f.tz,
-      driver_id: null,
+      driver_id: driverId,
       seats: f.seats || 4,
       departure,
       sort: 999,
@@ -1130,6 +1146,32 @@ export async function closePeriod(name: string, start: string, note: string): Pr
   if (!name.trim()) throw new Error('נדרש שם לתקופה החדשה');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) throw new Error('תאריך התחלה לא תקין');
   await rpc('close_period', { new_name: name.trim(), new_start: start, note: note.trim() });
+}
+
+/**
+ * Files a נפ״ק — who rides in which vehicle — as it stands right now.
+ *
+ * The rows are written down whole, names and personal numbers included, rather
+ * than as references to people. A manifest is a record of a moment: somebody
+ * changing team next week must not change what went out today.
+ */
+export async function issueNpak(
+  db: Db,
+  user: Person,
+  trainingId: string,
+  rows: NpakRow[],
+): Promise<Npak> {
+  if (!rows.length) throw new Error('אין רכבים בנפ״ק');
+  const missing = rows.find((r) => !r.driver);
+  if (missing) throw new Error(`לרכב ${missing.type}${missing.tz ? ` צ׳ ${missing.tz}` : ''} לא שובץ נהג`);
+
+  const { data, error } = await sb()
+    .from('npak')
+    .insert({ training_id: trainingId, issued_by: user.id, rows })
+    .select('*')
+    .single();
+  check(error);
+  return data as Npak;
 }
 
 export const setMyNotif = (prefs: Person['notif']) => rpc('set_my_notif', { prefs });

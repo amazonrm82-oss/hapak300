@@ -8,7 +8,7 @@
 -- בלי public בנתיב החיפוש, ובלי הקידומת הוא לא מוצא את הטבלאות.
 --
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
--- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07
+-- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07 → patch-08
 -- ═══════════════════════════════════════════════════════════════════════════
 
 with checks(sort, patch, what, ok) as (values
@@ -131,7 +131,15 @@ with checks(sort, patch, what, ok) as (values
             where table_name = 'people_view' and column_name = 'sight_serial')),
   (38, '07', 'וסמל הצוות רשאי לרשום אותה',
    (select pg_get_functiondef(oid) from pg_proc where proname = 'guard_people_self_edit')
-   like '%sight_serial%')
+   like '%sight_serial%'),
+
+  -- ── patch-08 ──
+  (39, '08', 'נפ״ק — מי נוסע באיזה רכב, ומתי הוצא',
+   to_regclass('public.npak') is not null),
+  (40, '08', 'והוא נקרא רק על ידי מי שרשאי לראות מספרים אישיים',
+   exists (select 1 from pg_policies
+            where tablename = 'npak' and policyname = 'npak_read'
+              and qual like '%is_team_cmd%'))
 )
 
 select
@@ -165,6 +173,7 @@ select case
                 where table_name = 'people_view' and column_name = 'absent_from')
    and exists (select 1 from information_schema.columns
                 where table_name = 'people_view' and column_name = 'sight_serial')
+   and to_regclass('public.npak') is not null
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

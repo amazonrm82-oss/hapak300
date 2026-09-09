@@ -7,6 +7,7 @@ import { LogisticsEditor, type LogisticsDraft } from '@/components/dialogs/Logis
 import { Field } from '@/components/ui/bits';
 import { DEFAULT_FREQ, DEFAULT_PICKUP, DEPARTURE_LEAD_MINUTES, FIRE_MODES } from '@/lib/core/constants';
 import { addDays, addMinutes, weekStart } from '@/lib/core/dates';
+import { canDrive } from '@/lib/core/alerts';
 import { defaultLogistics } from '@/lib/core/defaults';
 import { roleLabel } from '@/lib/core/permissions';
 import { fullName, topicName, topicSafety } from '@/lib/core/selectors';
@@ -73,20 +74,27 @@ const EMPTY_LOGISTICS: LogisticsDraft = { gear: [], vehicles: [], ammo: [], food
  *
  * The plan comes across; what happened on the day does not — nothing is
  * returned or missing yet, no rounds have been fired, and no vehicle has a
- * fault. The driver is left out on purpose: who drives is a decision for that
- * day, and a licence in date last month may not be in date now.
+ * fault. The driver comes across only if he may still drive on the new date:
+ * a licence that was in date last month may have run out since, and the seat
+ * is then left empty for the commander to fill rather than filled with someone
+ * the database will refuse.
  */
-const copyLogistics = (t: TrainingFull): LogisticsDraft => ({
+const copyLogistics = (db: Db, t: TrainingFull, date: string): LogisticsDraft => ({
   gear: t.gear.map((g) => ({ name: g.name, qty: g.qty, returned: false, missing: '', owner_id: null })),
-  vehicles: t.vehicles.map((v) => ({
-    type: v.type,
-    tz: v.tz,
-    driver_id: null,
-    seats: v.seats,
-    departure: v.departure,
-    fitness: v.fitness,
-    fault: '',
-  })),
+  vehicles: t.vehicles.map((v) => {
+    const driver = db.people.find((p) => p.id === v.driver_id);
+    const stillDrives =
+      !!driver && driver.status === 'active' && (driver.is_driver || driver.role === 'נהג') && canDrive(driver, date);
+    return {
+      type: v.type,
+      tz: v.tz,
+      driver_id: stillDrives ? v.driver_id : null,
+      seats: v.seats,
+      departure: v.departure,
+      fitness: v.fitness,
+      fault: '',
+    };
+  }),
   ammo: t.ammo.map((a) => ({
     weapon: a.weapon,
     per_fighter: a.per_fighter,
@@ -180,7 +188,7 @@ export function TrainingFormDialog({ open, training, duplicateOf = null, week = 
     setLogi(
       (cur) =>
         cur ??
-        (duplicateOf ? copyLogistics(duplicateOf) : EMPTY_LOGISTICS),
+        (duplicateOf ? copyLogistics(db, duplicateOf, addDays(duplicateOf.date, 7)) : EMPTY_LOGISTICS),
     );
   }, [open, db, training, duplicateOf]);
 
@@ -412,6 +420,7 @@ export function TrainingFormDialog({ open, training, duplicateOf = null, week = 
         <LogisticsEditor
           db={db}
           value={logi}
+          date={f.date}
           onChange={(next) => {
             setLogi(next);
           }}
