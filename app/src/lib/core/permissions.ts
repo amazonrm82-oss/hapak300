@@ -128,9 +128,9 @@ export function canEditPerson(user: Person | null, target: Person): boolean {
  * May this person be placed in the מפקדה — that is, outside any team?
  *
  * The מפקדה is a table of organisation and not a place to park people: the
- * brigade commander and his deputy stand there, and so do the two who run the
- * system — the administrator and the HQ-party commander — by their post.
- * Everyone else belongs to a team.
+ * brigade commander, his deputy and the operations officer stand there, and so
+ * do the two who run the system — the administrator and the HQ-party commander
+ * — by their post. Everyone else belongs to a team.
  */
 export function fitsStaff(p: {
   role: string;
@@ -159,7 +159,7 @@ export const canSetStaff = (user: Person | null): boolean =>
 /**
  * The roles this person may hand out.
  *
- * מח״ט and סמח״ט are not choices on a form — there is one of each in a
+ * The מפקדה posts are not choices on a form — there is one of each in a
  * brigade, and they are entered by hand by the administrator or the HQ-party
  * commander. Everyone else picks from what is left.
  */

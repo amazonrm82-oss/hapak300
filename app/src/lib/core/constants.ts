@@ -61,6 +61,7 @@ export const RANK_ORDER: Record<string, number> = Object.fromEntries(RANKS.map((
 export const ROLES = [
   'מח״ט',
   'סמח״ט',
+  'קצין אג״ם',
   'מפקד צוות',
   'סמל צוות',
   'מפקד חפ״ק',
@@ -100,12 +101,21 @@ export const ROLE_SERGEANT = 'סמל צוות';
 /**
  * Who stands in the מפקדה rather than in a team.
  *
- * It is a table of organisation, not a preference: the brigade commander and
- * his deputy. Anyone else belongs to a team — and the two people who run this
- * system, the administrator and the HQ-party commander, are there by their
- * post whatever their role says.
+ * It is a table of organisation, not a preference: the brigade commander, his
+ * deputy, and the operations officer — one of each, entered by hand. Anyone
+ * else belongs to a team, and the two people who run this system — the
+ * administrator and the HQ-party commander — are there by their post whatever
+ * their role says.
+ *
+ * Adding a post to the establishment is this line plus a unique index in the
+ * database; every screen and every check reads the list rather than spelling
+ * the roles out again.
  */
-export const STAFF_ROLES = ['מח״ט', 'סמח״ט'] as const;
+export const STAFF_ROLES = ['מח״ט', 'סמח״ט', 'קצין אג״ם'] as const;
+
+/** ״מח״ט, סמח״ט או קצין אג״ם״ — for the one message that has to name them. */
+export const staffRolesText = (sep = ', ', last = ' או ') =>
+  STAFF_ROLES.slice(0, -1).join(sep) + last + STAFF_ROLES[STAFF_ROLES.length - 1];
 
 export const WEAPONS = [
   'M4 / תבור',

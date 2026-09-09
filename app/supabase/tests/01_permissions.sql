@@ -1484,3 +1484,64 @@ select case when not exists (select 1 from training_guests where person_id = me_
             then '✅' else '❌' end || '  156  ומסיר את עצמו כשהוא רוצה';
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ קצין אג״ם — תקן אחד, ובאותם כללים ════════
+--
+-- אותם שלושה כללים של המח״ט: רק מנהל מערכת או מפקד חפ״ק משבצים, אחד ולא
+-- יותר, ומי שיושב שם אינו שייך לצוות ולכן מצרף את עצמו לאימונים.
+
+-- מי שאינו מנהל או מפקד חפ״ק אינו משבץ — גם אם הוא עצמו יושב במפקדה.
+-- נבדק לפי הערך: מדיניות שורות שאינה מתאימה לאף שורה אינה מרימה שגיאה.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$ begin
+  update people set role = 'קצין אג״ם', team_id = null
+   where id = (select id from people where name = 'איתי רוזן');
+exception when others then null;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+select case when (select role from people_view where name = 'איתי רוזן') <> 'קצין אג״ם'
+            then '✅' else '❌' end || '  157  קצין אג״ם אינו מוזן על ידי מי שאינו מנהל או מפקד חפ״ק';
+
+-- אבל מנהל המערכת כן, והוא נכנס למפקדה
+update people set role = 'קצין אג״ם', team_id = null
+ where id = (select id from people where name = 'איתי רוזן');
+select case when (select role from people_view where name = 'איתי רוזן') = 'קצין אג״ם'
+             and (select team_id from people_view where name = 'איתי רוזן') is null
+            then '✅' else '❌' end || '  158  ומנהל המערכת משבץ אותו במפקדה';
+
+-- ואין שניים.
+--
+-- הכתובת נלקחת מ-`people_view` ולא מ-`people`: ל-authenticated יש UPDATE על
+-- הטבלה אבל לא SELECT, ולכן תנאי WHERE שקורא עמודה מהטבלה עצמה נופל על
+-- ״permission denied״ — וזה נראה בדיוק כמו חסימה מוצלחת. כאן רק הפרת
+-- הייחודיות נחשבת הצלחה; כל שגיאה אחרת היא כשל, כי היא אומרת שהאינדקס לא
+-- נבדק בכלל.
+do $t$ begin
+  update people set role = 'קצין אג״ם'
+   where id = (select id from people_view where pn = '7300001');
+  raise notice '❌  159  נכנס קצין אג״ם שני — כשל';
+exception when unique_violation then
+  raise notice '✅  159  אין שני קציני אג״ם';
+when others then
+  raise notice '❌  159  נדחה מסיבה אחרת: % / %', sqlstate, sqlerrm;
+end $t$;
+
+-- וכמו כל מי שבמפקדה — הוא מצרף את עצמו לאימון
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+set role authenticated;
+
+insert into training_guests (training_id, person_id)
+values ((select id from trainings where location = 'שטח היעדרות'), me_id());
+
+select case when exists (select 1 from training_guests where person_id = me_id())
+            then '✅' else '❌' end || '  160  והוא מצרף את עצמו לאימון בעצמו';
+
+reset role; reset request.jwt.claim.sub;

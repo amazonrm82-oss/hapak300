@@ -9,7 +9,7 @@ import {
   type NewGear,
   type NewVehicle,
 } from '@/lib/core/defaults';
-import { STAFF_ROLES } from '@/lib/core/constants';
+import { STAFF_ROLES, staffRolesText } from '@/lib/core/constants';
 import { canSetStaff, fitsStaff } from '@/lib/core/permissions';
 import {
   activeTrainings,
@@ -1036,11 +1036,11 @@ export async function savePerson(
   if (row.medical_profile !== null && (row.medical_profile < 21 || row.medical_profile > 97))
     throw new Error('פרופיל רפואי חייב להיות בין 21 ל-97 (או ריק)');
 
-  // There is one brigade commander and one deputy, and the two of them are
-  // entered by hand by whoever answers for the unit's structure.
+  // The מפקדה posts are an establishment of one each, entered by hand by
+  // whoever answers for the unit's structure.
   if ((STAFF_ROLES as readonly string[]).includes(row.role)) {
     if (!canSetStaff(user))
-      throw new Error('רק מנהל מערכת או מפקד חפ״ק יכולים לשבץ מח״ט או סמח״ט');
+      throw new Error(`רק מנהל מערכת או מפקד חפ״ק יכולים לשבץ ${staffRolesText()}`);
     const held = db.people.find((p) => p.role === row.role && p.id !== personId);
     if (held)
       throw new Error(`${row.role} כבר משובץ — ${fullName(held)}. שנה את תפקידו קודם.`);
@@ -1051,7 +1051,9 @@ export async function savePerson(
     if (!canSetStaff(user))
       throw new Error('רק מנהל מערכת או מפקד חפ״ק יכולים לשבץ למפקדה');
     if (!fitsStaff(row))
-      throw new Error('למפקדה משובצים מח״ט וסמח״ט בלבד, מעבר למנהל המערכת ומפקד החפ״ק');
+      throw new Error(
+        `למפקדה משובצים ${staffRolesText(', ', ' ו')} בלבד, מעבר למנהל המערכת ומפקד החפ״ק`,
+      );
   }
 
   // Never let an administrator strip their own management rights — but only an

@@ -42,6 +42,7 @@ const PART2 = [
   'patch-10-one-mahat.sql',
   'patch-11-own-kit.sql',
   'patch-12-staff-joins.sql',
+  'patch-13-agam.sql',
 ];
 
 const banner = (n, of, what, after) => `-- ═══════════════════════════════════════════════════════════════════════════
