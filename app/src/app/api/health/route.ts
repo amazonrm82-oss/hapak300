@@ -64,7 +64,20 @@ export async function GET(request: Request) {
     /* not a valid URL at all */
   }
 
-  const context = { env, missing, projectHost, urlLooksRight, push };
+  /**
+   * Which build is actually serving this.
+   *
+   * A screen that behaves like last week's version and a database that is fully
+   * patched look identical from the outside, and we lost an evening to exactly
+   * that. Vercel fills these in at build time; neither is a secret — the commit
+   * is public in the repository and the branch name is just a name.
+   */
+  const build = {
+    commit: (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7) || 'לא ידוע (בנייה מקומית)',
+    branch: process.env.VERCEL_GIT_COMMIT_REF ?? 'לא ידוע',
+  };
+
+  const context = { env, missing, projectHost, urlLooksRight, push, build };
 
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json(

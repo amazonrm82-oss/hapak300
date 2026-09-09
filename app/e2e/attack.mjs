@@ -163,6 +163,11 @@ bad_or_ok('דחיפת התראות דורשת התחברות', flush.status === 
 
 const health = await (await fetch(`${APP}/api/health`)).json();
 bad_or_ok(
+  'בדיקת התקינות אומרת איזו גרסה רצה',
+  !!health.build?.commit && !!health.build?.branch,
+  JSON.stringify(health.build ?? null),
+);
+bad_or_ok(
   'בדיקת התקינות אינה מפרסמת את גודל היחידה',
   typeof health.people_count !== 'number' || health.people_count === 0,
   `people_count=${health.people_count}`,
