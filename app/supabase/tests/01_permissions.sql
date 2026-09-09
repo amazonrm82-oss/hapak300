@@ -1425,3 +1425,62 @@ select case when coalesce((select weapon_serial from people_view where name = '�
             then '✅' else '❌' end || '  152  ואינו נוגע בצ׳ של אחר';
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ המפקדה מצטרפת בעצמה ════════
+--
+-- נבדק על מי שבמפקדה בלי שום הרשאה אחרת: מנהל המערכת עומד שם ממילא, וכל
+-- מה שהוא מצליח לעשות אינו מוכיח כלום על הכלל הזה.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+-- הוא הושבת קודם בבדיקה אחרת, ומי שמושבת אינו מצטרף לאימון
+update people set role = 'מח״ט', team_id = null, status = 'active'
+ where id = (select id from people where name = 'תומר גל');
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+set role authenticated;
+
+insert into training_guests (training_id, person_id, makeup_for, note)
+values ((select id from trainings where location = 'שטח היעדרות'), me_id(), null, 'הצטרפות עצמית');
+
+select case when exists (
+         select 1 from training_guests
+          where person_id = me_id()
+            and training_id = (select id from trainings where location = 'שטח היעדרות'))
+            then '✅' else '❌' end || '  153  מי שבמפקדה מצרף את עצמו לאימון';
+
+select case when exists (
+         select 1 from training_participants(
+           (select id from trainings where location = 'שטח היעדרות')) p
+          where p.name = 'תומר גל')
+            then '✅' else '❌' end || '  154  ומשם הוא על המצבת של אותו אימון';
+
+-- אבל לא מצרף מישהו אחר
+do $t$ begin
+  insert into training_guests (training_id, person_id)
+  values ((select id from trainings where location = 'שטח היעדרות'),
+          (select id from people where name = 'דניאל כץ'));
+exception when others then null;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+select case when not exists (
+         select 1 from training_guests g join people p on p.id = g.person_id
+          where p.name = 'דניאל כץ')
+            then '✅' else '❌' end || '  155  ואינו מצרף מישהו אחר';
+
+-- ומסיר את עצמו
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+set role authenticated;
+
+delete from training_guests where person_id = me_id();
+select case when not exists (select 1 from training_guests where person_id = me_id())
+            then '✅' else '❌' end || '  156  ומסיר את עצמו כשהוא רוצה';
+
+reset role; reset request.jwt.claim.sub;

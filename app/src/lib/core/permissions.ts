@@ -142,6 +142,16 @@ export function fitsStaff(p: {
   );
 }
 
+/**
+ * Somebody who stands in the מפקדה rather than in a team.
+ *
+ * No training is "his" — which used to mean somebody had to attach him to one.
+ * That is backwards: a brigade commander who decides to come to a training
+ * comes to it. He attaches himself, and takes himself off again.
+ */
+export const isStaff = (user: Person | null): boolean =>
+  !!user && user.status === 'active' && !user.team_id;
+
 /** And who may put someone there: the two who answer for the unit's structure. */
 export const canSetStaff = (user: Person | null): boolean =>
   !!user && (user.is_admin || user.is_hapak_commander);

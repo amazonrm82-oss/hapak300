@@ -26,7 +26,7 @@ import {
   orderText,
   printHTML,
 } from '@/lib/core/exports';
-import { permsFor, canMarkAttendance } from '@/lib/core/permissions';
+import { permsFor, canMarkAttendance, isStaff } from '@/lib/core/permissions';
 import {
   attendanceStats,
   byId,
@@ -38,11 +38,13 @@ import {
 } from '@/lib/core/selectors';
 import type { InviteRole, TrainingFull } from '@/lib/core/types';
 import {
+  addGuest,
   cancelTraining,
   deleteTraining,
   duplicateTraining,
   markChatRead,
   postponeTraining,
+  removeGuest,
 } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
@@ -85,6 +87,9 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
   const st = attendanceStats(db, t);
   const isLive = t.status !== 'done' && t.status !== 'cancelled';
   const isPart = participants(db, t).some((p) => p.id === user.id);
+  // The מפקדה belongs to no team, so no training arrives on its own. Whoever
+  // stands there decides for himself, and takes himself off the same way.
+  const joinable = isStaff(user) && t.status !== 'cancelled' && t.status !== 'done';
   const mine = t.attendance[user.id];
   const canMark = isPart && canMarkAttendance(db, user, t, user.id, today);
   const unreadChat = t.chat.filter((m) => !m.read_by.includes(user.id)).length;
@@ -139,6 +144,24 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {joinable && !isPart && (
+            <button
+              className="btn btn-primary"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={() => void run(() => addGuest(t.id, user.id, null, 'הצטרפות עצמית מהמפקדה'), 'הצטרפת לאימון')}
+            >
+              אני מצטרף לאימון
+            </button>
+          )}
+          {joinable && isPart && (
+            <button
+              className="btn btn-ghost"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={() => void run(() => removeGuest(t.id, user.id), 'הוסרת מהאימון')}
+            >
+              ביטול ההצטרפות
+            </button>
+          )}
           {canMark && (
             <button className="btn btn-primary" onClick={() => setMarking(true)} style={{ whiteSpace: 'nowrap' }}>
               {mine ? 'עדכון נוכחות' : 'סימון נוכחות'}
