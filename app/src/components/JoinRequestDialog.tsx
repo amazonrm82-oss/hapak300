@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
+import { RANK_FULL, RANKS } from '@/lib/core/constants';
+import { rolesFor } from '@/lib/core/permissions';
 import type { TeamKey } from '@/lib/core/types';
 import { useApp } from '@/lib/data/provider';
 import { submitJoinRequest } from '@/lib/data/mutations';
@@ -85,7 +86,8 @@ export function JoinRequestDialog({ open, onClose }: { open: boolean; onClose: (
         </Field>
         <Field label="תפקיד">
           <select className="input" value={f.role} onChange={set('role')}>
-            {ROLES.filter((r) => r !== 'מפקד צוות').map((r) => (
+            {/* nobody asks to join as the brigade commander */}
+            {rolesFor(null).map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>

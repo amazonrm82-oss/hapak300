@@ -8,7 +8,7 @@
 -- בלי public בנתיב החיפוש, ובלי הקידומת הוא לא מוצא את הטבלאות.
 --
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
--- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07 → patch-08 → patch-09
+-- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07 → patch-08 → patch-09 → patch-10
 -- ═══════════════════════════════════════════════════════════════════════════
 
 with checks(sort, patch, what, ok) as (values
@@ -144,7 +144,16 @@ with checks(sort, patch, what, ok) as (values
   -- ── patch-09 ──
   (41, '09', 'המפקדה היא תקן — מח״ט וסמח״ט בלבד',
    exists (select 1 from pg_trigger
-            where tgname = 'people_staff_guard' and not tgisinternal))
+            where tgname = 'people_staff_guard' and not tgisinternal)),
+
+  -- ── patch-10 ──
+  (42, '10', 'מח״ט אחד וסמח״ט אחד, ולא יותר',
+   (select count(*) from pg_indexes
+     where tablename = 'people'
+       and indexname in ('people_one_mahat', 'people_one_smahat')) = 2),
+  (43, '10', 'ושניהם מוזנים ביד, רק על ידי מנהל או מפקד חפ״ק',
+   (select pg_get_functiondef(oid) from pg_proc where proname = 'guard_staff_seat')
+   like '%יכולים לשבץ מח״ט%')
 )
 
 select
@@ -181,6 +190,9 @@ select case
    and to_regclass('public.npak') is not null
    and exists (select 1 from pg_trigger
                 where tgname = 'people_staff_guard' and not tgisinternal)
+   and (select count(*) from pg_indexes
+         where tablename = 'people'
+           and indexname in ('people_one_mahat', 'people_one_smahat')) = 2
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

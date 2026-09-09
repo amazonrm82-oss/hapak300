@@ -1353,3 +1353,38 @@ select case when (select team_id from people_view where name = 'תומר גל') 
             then '✅' else '❌' end || '  146  ומי שאינו מנהל או מפקד חפ״ק אינו משבץ למפקדה';
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ מח״ט אחד, סמח״ט אחד ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+-- דניאל כץ כבר סמח״ט מהבדיקה הקודמת; שני אינו אפשרי
+do $t$ begin
+  update people set role = 'סמח״ט'
+   where id = (select id from people where name = 'תומר גל');
+  raise notice '❌  147  נכנס סמח״ט שני — כשל';
+exception when unique_violation then
+  raise notice '✅  147  אין שני סמח״טים';
+when others then
+  raise notice '✅  147  אין שני סמח״טים (נדחה)';
+end $t$;
+
+-- ולוחם רגיל אינו מגדיר לעצמו מח״ט
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+set role authenticated;
+
+do $t$ begin
+  update people set role = 'מח״ט' where id = me_id();
+exception when others then null;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+select case when not exists (select 1 from people where role = 'מח״ט')
+            then '✅' else '❌' end || '  148  ולוחם אינו ממנה את עצמו למח״ט';
+
+reset role; reset request.jwt.claim.sub;

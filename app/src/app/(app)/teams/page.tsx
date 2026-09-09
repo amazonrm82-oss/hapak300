@@ -10,8 +10,14 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
 import { certAlerts } from '@/lib/core/alerts';
 import { fmtShort } from '@/lib/core/dates';
-import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
-import { canEditKitOf, canEditPerson, permsFor, roleLabel } from '@/lib/core/permissions';
+import { RANK_FULL, RANKS } from '@/lib/core/constants';
+import {
+  canEditKitOf,
+  canEditPerson,
+  permsFor,
+  roleLabel,
+  rolesFor,
+} from '@/lib/core/permissions';
 import { readinessOf } from '@/lib/core/readiness';
 import {
   absentOn,
@@ -149,7 +155,7 @@ export default function TeamsPage() {
                 onChange={(e) => setQa((s) => ({ ...s, role: e.target.value }))}
                 style={{ minHeight: 34 }}
               >
-                {ROLES.filter((r) => r !== 'מפקד צוות').map((r) => (
+                {rolesFor(user).map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>

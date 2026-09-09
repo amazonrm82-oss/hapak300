@@ -543,6 +543,19 @@ try {
     check('בלי התוצאות של הקודם', !(await has('85.0')));
   }
 
+  // ── מח״ט וסמח״ט: מוזנים ביד, ואחד מכל אחד ──
+  //
+  // The roles are on the administrator's list because he is the one who enters
+  // them; the second one of the same kind is refused outright.
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  const roleOpts = await page
+    .locator('.field:has(label:text-is("תפקיד")) select')
+    .first()
+    .locator('option')
+    .allInnerTexts();
+  check('מנהל המערכת רואה מח״ט וסמח״ט ברשימת התפקידים', roleOpts.includes('מח״ט'));
+
   // ── נפ״ק: a screen of its own ──
   //
   // Not part of a training: a convoy is put together on the day, from the
@@ -682,6 +695,11 @@ try {
   await settle(1200);
   const canCreate = await page.locator('button:has-text("אימון חדש")').count();
   check('ואין לו כפתור ליצירת אימון', canCreate === 0);
+
+  // the two posts at the top of the brigade are not on his list at all
+  await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+  await settle(1200);
+  check('ואינו רואה מח״ט או סמח״ט ברשימת התפקידים', !(await has('סמח״ט')));
 
   await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
   await settle(1200);

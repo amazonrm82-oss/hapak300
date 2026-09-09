@@ -3,8 +3,14 @@
 import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { CERT_TYPES, NVG_TYPES, SIGHT_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
-import { canEditPerson, canGrantRights, canSetStaff, permsFor } from '@/lib/core/permissions';
+import { CERT_TYPES, NVG_TYPES, SIGHT_TYPES, RANK_FULL, RANKS } from '@/lib/core/constants';
+import {
+  canEditPerson,
+  canGrantRights,
+  canSetStaff,
+  permsFor,
+  rolesFor,
+} from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
 import { removePerson, resetPin, revokeSessions, savePerson, type PersonForm } from '@/lib/data/mutations';
@@ -217,7 +223,7 @@ export function PersonDialog({ open, person, onClose }: Props) {
           </Field>
           <Field label="תפקיד בכוח">
             <select className="input" value={f.role} onChange={set('role')}>
-              {ROLES.filter((r) => r !== 'מפקד צוות').map((r) => (
+              {rolesFor(user).map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>

@@ -9,6 +9,7 @@ import {
   type NewGear,
   type NewVehicle,
 } from '@/lib/core/defaults';
+import { STAFF_ROLES } from '@/lib/core/constants';
 import { canSetStaff, fitsStaff } from '@/lib/core/permissions';
 import {
   activeTrainings,
@@ -1034,6 +1035,16 @@ export async function savePerson(
 
   if (row.medical_profile !== null && (row.medical_profile < 21 || row.medical_profile > 97))
     throw new Error('פרופיל רפואי חייב להיות בין 21 ל-97 (או ריק)');
+
+  // There is one brigade commander and one deputy, and the two of them are
+  // entered by hand by whoever answers for the unit's structure.
+  if ((STAFF_ROLES as readonly string[]).includes(row.role)) {
+    if (!canSetStaff(user))
+      throw new Error('רק מנהל מערכת או מפקד חפ״ק יכולים לשבץ מח״ט או סמח״ט');
+    const held = db.people.find((p) => p.role === row.role && p.id !== personId);
+    if (held)
+      throw new Error(`${row.role} כבר משובץ — ${fullName(held)}. שנה את תפקידו קודם.`);
+  }
 
   // The מפקדה is a table of organisation and not a place to park people.
   if (row.team_id === null) {

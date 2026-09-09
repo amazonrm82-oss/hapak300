@@ -1,4 +1,4 @@
-import { ROLE_RASAP, ROLE_SERGEANT, STAFF_ROLES } from './constants';
+import { ROLES, ROLE_RASAP, ROLE_SERGEANT, STAFF_ROLES } from './constants';
 import type { Db, Person, Training } from './types';
 
 /**
@@ -145,6 +145,18 @@ export function fitsStaff(p: {
 /** And who may put someone there: the two who answer for the unit's structure. */
 export const canSetStaff = (user: Person | null): boolean =>
   !!user && (user.is_admin || user.is_hapak_commander);
+
+/**
+ * The roles this person may hand out.
+ *
+ * מח״ט and סמח״ט are not choices on a form — there is one of each in a
+ * brigade, and they are entered by hand by the administrator or the HQ-party
+ * commander. Everyone else picks from what is left.
+ */
+export function rolesFor(user: Person | null): string[] {
+  const all = (ROLES as readonly string[]).filter((r) => r !== 'מפקד צוות');
+  return canSetStaff(user) ? all : all.filter((r) => !(STAFF_ROLES as readonly string[]).includes(r));
+}
 
 export function canEditKitOf(db: Db, user: Person | null, target: Person): boolean {
   if (!user) return false;
