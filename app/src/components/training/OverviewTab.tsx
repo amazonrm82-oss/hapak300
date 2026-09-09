@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { statusWord } from '@/components/TrainingCard';
 import { AlertList, ProgressBar, SectionCard, Tag } from '@/components/ui/bits';
@@ -196,10 +197,15 @@ export function OverviewTab({ training: t, onInvite }: Props) {
             <Label>רכב פינוי</Label>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span>{evac ? `${evac.type} צ׳ ${evac.tz}` : 'טרם נקבע'}</span>
-              {/* an empty picker tells nobody why it is empty */}
+              {/* an empty picker tells nobody why it is empty, and leaving him to
+                  find the fleet screen on his own is the same problem again */}
               {perms.canEdit && t.vehicles.length === 0 && fleetSpare.length === 0 && (
                 <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
-                  אין רכבים במאגר — הוסף אותם במסך ״לוגיסטיקה״
+                  אין רכבים במאגר —{' '}
+                  <Link href="/logistics" style={{ color: 'var(--color-accent-300)' }}>
+                    הוסף רכב לצי היחידה
+                  </Link>{' '}
+                  והוא ייבחר כאן.
                 </span>
               )}
               {perms.canEdit && (t.vehicles.length > 0 || fleetSpare.length > 0) && (
