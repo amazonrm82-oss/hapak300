@@ -107,6 +107,22 @@ const answerPrompts = async (limit = 4) => {
 };
 
 /**
+ * Types a personal number into the login screen.
+ *
+ * The screen remembers the last number on this device and opens straight at the
+ * code, which is the point of ״זכור אותי״ — so signing in as somebody else
+ * starts by saying that this is somebody else.
+ */
+const enterPn = async (pn) => {
+  const field = page.locator('input').first();
+  if (await field.isDisabled().catch(() => false)) {
+    await page.locator('button:has-text("לא אתה")').first().click();
+    await settle(700);
+  }
+  await page.fill('input', pn);
+};
+
+/**
  * Clicks the first button whose label contains `label`.
  *
  * Waits out any button that reads ״רגע…״ first: while a request is in flight
@@ -128,7 +144,7 @@ try {
   check('מסך הכניסה נטען', await has('מספר אישי'));
 
   // ── an unknown personal number is refused ──
-  await page.fill('input', '9999999');
+  await enterPn('9999999');
   await refused(async () => {
     await click('המשך');
     await settle(900);
@@ -150,7 +166,7 @@ try {
 
   // ── the administrator's first login asks for a code, without naming them ──
   await page.reload({ waitUntil: 'networkidle' });
-  await page.fill('input', '8409505');
+  await enterPn('8409505');
   await click('המשך');
   await settle(900);
   const body3 = await text();
@@ -180,12 +196,12 @@ try {
   await settle();
   await click('יציאה');
   await settle(1200);
+  // ── ״זכור אותי״: המספר נשמר במכשיר, ונשאר רק הקוד ──
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input', '8409505');
-  await click('המשך');
-  await settle(900);
-  const askedAgain = await has('כניסה ראשונה');
-  check('הכניסה השנייה מבקשת רק את הקוד, לא בחירה מחדש', !askedAgain);
+  await settle(2200);
+  check('המספר האישי נזכר והמסך פותח ישר בקוד', await has('קוד כניסה'));
+  check('ומוצע לצאת מזה בלחיצה', await has('לא אתה'));
+  check('והכניסה השנייה אינה מבקשת לבחור קוד מחדש', !(await has('כניסה ראשונה')));
 
   await page.locator('input[type="password"]').first().fill('8317');
   await click('כניסה');
@@ -668,7 +684,7 @@ try {
   await settle(1200);
 
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input', '7654321');
+  await enterPn('7654321');
   await click('המשך');
   await settle(900);
   const fighterPins = page.locator('input[type="password"]');
@@ -735,7 +751,7 @@ try {
   await click('יציאה');
   await settle(1200);
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input', '7654324');
+  await enterPn('7654324');
   await click('המשך');
   await settle(900);
   const sgtPins = page.locator('input[type="password"]');
@@ -813,7 +829,7 @@ try {
   await click('יציאה');
   await settle(1200);
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input', '7654323');
+  await enterPn('7654323');
   await click('המשך');
   await settle(900);
   const cmdPins = page.locator('input[type="password"]');

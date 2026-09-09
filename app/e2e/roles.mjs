@@ -111,6 +111,13 @@ for (const role of ROLES) {
 
   // ── in ──
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  // each role gets its own browser context, so nothing is remembered here —
+  // but say so out loud rather than relying on it
+  const pnField = page.locator('input').first();
+  if (await pnField.isDisabled().catch(() => false)) {
+    await page.locator('button:has-text("לא אתה")').first().click();
+    await page.waitForTimeout(700);
+  }
   await page.fill('input', role.pn);
   await page.locator('button:has-text("המשך")').first().click();
   // the button says ״רגע…״ while the request is in flight; clicking the next

@@ -2,13 +2,16 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { JoinRequestDialog } from '@/components/JoinRequestDialog';
 import { Field } from '@/components/ui/bits';
 import { useApp } from '@/lib/data/provider';
 import { callServer, supabase } from '@/lib/supabase/client';
 
 type Stage = 'pn' | 'pin' | 'set-pin';
+
+/** Where this device keeps the personal number it was asked to remember. */
+const REMEMBER_KEY = 'hapak-remember-pn';
 
 interface LoginResponse {
   stage: Stage | 'ok';
@@ -33,10 +36,38 @@ export default function LoginPage() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [remember, setRemember] = useState(true);
+  // the remembered number is opened once, not on every render
+  const started = useRef(false);
 
   useEffect(() => {
     if (user) router.replace('/schedule');
   }, [user, router]);
+
+  /**
+   * A remembered personal number skips the first step.
+   *
+   * The number is not the secret — the code is — and typing seven digits on a
+   * phone in the dark before an 05:30 departure is the part people give up on.
+   * It is kept on this device only, it is offered rather than assumed, and
+   * ״לא אתה?״ clears it in one tap.
+   */
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    let saved = '';
+    try {
+      saved = localStorage.getItem(REMEMBER_KEY) ?? '';
+    } catch {
+      /* a browser with storage blocked simply does not remember */
+    }
+    if (!/^\d{7}$/.test(saved)) return;
+    setPn(saved);
+    void openFor(saved);
+    // once, on the way in: `openFor` is stable enough for this and re-running it
+    // would ask the server about the same number again
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allowJoin = db?.settings.allow_join !== false;
   const appName = db?.settings.app_name ?? 'כשירות חפ״ק מח״ט 300';
@@ -51,6 +82,32 @@ export default function LoginPage() {
     router.replace('/schedule');
   }
 
+  /** The first step for one number, used by the form and by the remembered one. */
+  async function openFor(number: string) {
+    setErr('');
+    setBusy(true);
+    try {
+      const r = await callServer<LoginResponse>('/api/auth/login', { pn: number });
+      setWho(r.name ?? '');
+      setStage(r.stage === 'set-pin' ? 'set-pin' : 'pin');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'ההתחברות נכשלה');
+      forget();
+      setStage('pn');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Stops remembering this device's number. */
+  function forget() {
+    try {
+      localStorage.removeItem(REMEMBER_KEY);
+    } catch {
+      /* nothing to forget */
+    }
+  }
+
   async function submit() {
     setErr('');
     setBusy(true);
@@ -58,6 +115,12 @@ export default function LoginPage() {
       if (stage === 'pn') {
         if (!/^\d{7}$/.test(pn)) throw new Error('מספר אישי חייב להיות 7 ספרות');
         const r = await callServer<LoginResponse>('/api/auth/login', { pn });
+        try {
+          if (remember) localStorage.setItem(REMEMBER_KEY, pn);
+          else localStorage.removeItem(REMEMBER_KEY);
+        } catch {
+          /* storage blocked: the number is simply not remembered */
+        }
         setWho(r.name ?? '');
         setStage(r.stage === 'set-pin' ? 'set-pin' : 'pin');
         return;
@@ -86,6 +149,7 @@ export default function LoginPage() {
   }
 
   const back = () => {
+    forget();
     setStage('pn');
     setPin('');
     setPin2('');
@@ -128,6 +192,19 @@ export default function LoginPage() {
               style={{ letterSpacing: '.1em', fontSize: 18, textAlign: 'center' }}
             />
           </Field>
+
+          {stage === 'pn' && (
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              זכור אותי במכשיר הזה — בכניסה הבאה רק הקוד
+            </label>
+          )}
 
           {stage !== 'pn' && (
             <Field
@@ -188,7 +265,7 @@ export default function LoginPage() {
             </button>
             {stage !== 'pn' && (
               <button className="btn btn-ghost" onClick={back} disabled={busy}>
-                חזרה
+                לא אתה? החלף מספר
               </button>
             )}
             {allowJoin && stage === 'pn' && (

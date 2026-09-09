@@ -72,9 +72,14 @@ const clearPrompt = async () => {
 try {
   // ── in, as the administrator ──
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input', '8409505');
-  await click('המשך');
-  await settle(900);
+  await settle(1200);
+  // a device that remembers the number opens straight at the code
+  const pnField = page.locator('input').first();
+  if (!(await pnField.isDisabled().catch(() => false))) {
+    await page.fill('input', '8409505');
+    await click('המשך');
+    await settle(900);
+  }
   await page.locator('input[type="password"]').first().fill('8317');
   await click('כניסה');
   await page.waitForURL(/\/(schedule|my)/, { timeout: 20000 }).catch(() => {});
