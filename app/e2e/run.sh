@@ -112,4 +112,10 @@ say "attack"
 node e2e/attack.mjs "http://localhost:$PORT_APP" "http://localhost:$PORT_SHIM" "$NEXT_PUBLIC_SUPABASE_ANON_KEY"
 ATTACK=$?
 
-exit $(( FLOWS + ROLES + ATTACK ))
+# last on purpose: it postpones, cancels, archives and finally closes the
+# period, and after that the database is not the one the others ran against
+say "deep"
+node e2e/deep.mjs "http://localhost:$PORT_APP"
+DEEP=$?
+
+exit $(( FLOWS + ROLES + ATTACK + DEEP ))
