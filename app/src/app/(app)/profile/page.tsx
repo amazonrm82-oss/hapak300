@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { KitDialog } from '@/components/dialogs/KitDialog';
 import { PersonDialog } from '@/components/dialogs/PersonDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, ScoreBar, SectionCard } from '@/components/ui/bits';
@@ -28,6 +29,7 @@ export default function ProfilePage() {
   const { db, user, perms, today, toast, refresh, signOut } = useApp();
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
+  const [kitOpen, setKitOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!db || !user) return null;
@@ -132,6 +134,10 @@ export default function ProfilePage() {
             )}
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {/* the serials he signed for are his to keep straight */}
+              <button className="btn btn-secondary" onClick={() => setKitOpen(true)}>
+                הציוד שלי — נשק, אמר״ל וכוונת
+              </button>
               {perms.isAdmin && (
                 <>
                   <button className="btn btn-secondary" onClick={() => setEditOpen(true)}>
@@ -221,6 +227,7 @@ export default function ProfilePage() {
       </div>
 
       <PersonDialog open={editOpen} person={user} onClose={() => setEditOpen(false)} />
+      <KitDialog open={kitOpen} person={user} withCerts={false} onClose={() => setKitOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <style jsx>{`

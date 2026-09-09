@@ -8,7 +8,7 @@
 -- בלי public בנתיב החיפוש, ובלי הקידומת הוא לא מוצא את הטבלאות.
 --
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
--- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07 → patch-08 → patch-09 → patch-10
+-- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07 → patch-08 → patch-09 → patch-10 → patch-11
 -- ═══════════════════════════════════════════════════════════════════════════
 
 with checks(sort, patch, what, ok) as (values
@@ -153,7 +153,12 @@ with checks(sort, patch, what, ok) as (values
        and indexname in ('people_one_mahat', 'people_one_smahat')) = 2),
   (43, '10', 'ושניהם מוזנים ביד, רק על ידי מנהל או מפקד חפ״ק',
    (select pg_get_functiondef(oid) from pg_proc where proname = 'guard_staff_seat')
-   like '%יכולים לשבץ מח״ט%')
+   like '%יכולים לשבץ מח״ט%'),
+
+  -- ── patch-11 ──
+  (44, '11', 'כל אחד מעדכן את הצ׳ים של עצמו — נשק, אמר״ל וכוונת',
+   (select pg_get_functiondef(oid) from pg_proc where proname = 'guard_people_self_edit')
+   like '%''notif'', ''updated_at'',%')
 )
 
 select

@@ -717,6 +717,37 @@ try {
   await settle(1200);
   check('ואינו רואה מח״ט או סמח״ט ברשימת התפקידים', !(await has('סמח״ט')));
 
+  // ── the serials he signed for are his to keep straight ──
+  await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+  await settle(1400);
+  check('ללוחם יש כפתור לציוד שלו', await has('הציוד שלי'));
+  await click('הציוד שלי');
+  await settle(900);
+  await page.locator('input[placeholder="הצ׳ של הנשק"]').fill('9911223');
+  await page.locator('input[placeholder="סוג הכוונת"]').fill('מרס');
+  await page.locator('input[placeholder="הצ׳ של הכוונת"]').fill('4455667');
+  // read inside the dialog: the profile page behind it lists them too
+  check(
+    'ואין בו הסמכות — הן של המפקדים',
+    !(await page.locator('[role="dialog"]').innerText()).includes('הסמכות אישיות'),
+  );
+  await click('שמירה');
+  await settle(2200);
+  await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+  await settle(1400);
+  await click('הציוד שלי');
+  await settle(900);
+  check(
+    'והצ׳ שרשם נשמר וחזר',
+    (await page.locator('input[placeholder="הצ׳ של הנשק"]').inputValue()) === '9911223',
+  );
+  check(
+    'וגם הכוונת',
+    (await page.locator('input[placeholder="הצ׳ של הכוונת"]').inputValue()) === '4455667',
+  );
+  await page.keyboard.press('Escape');
+  await settle(600);
+
   await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
   await settle(1200);
   check('מסך הניהול חסום בפניו', await has('ניהול התקופה שמור'));

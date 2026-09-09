@@ -12,6 +12,8 @@ import { useApp } from '@/lib/data/provider';
 interface Props {
   open: boolean;
   person: Person | null;
+  /** Certifications are a commander's to write; a fighter sees only his kit. */
+  withCerts?: boolean;
   onClose: () => void;
 }
 
@@ -23,7 +25,7 @@ interface Props {
  * what it is allowed to send cannot fail halfway through a save — or quietly
  * carry a field he is not entitled to see.
  */
-export function KitDialog({ open, person, onClose }: Props) {
+export function KitDialog({ open, person, withCerts = true, onClose }: Props) {
   const { db, toast, refresh } = useApp();
   const [f, setF] = useState<KitForm>({
     weapon: '',
@@ -54,7 +56,7 @@ export function KitDialog({ open, person, onClose }: Props) {
   async function save() {
     setBusy(true);
     try {
-      await saveKit(person!.id, f);
+      await saveKit(person!.id, f, withCerts);
       await refresh();
       toast('הפרטים נשמרו');
       onClose();
@@ -69,8 +71,16 @@ export function KitDialog({ open, person, onClose }: Props) {
     <Dialog
       open
       onClose={onClose}
-      title={`נשק, אמר״ל והכשרות · ${fullName(person)}`}
-      body="סמל צוות מעדכן נשק, אמר״ל והכשרות. שאר הפרטים שמורים למפקד החפ״ק ולמנהל המערכת."
+      title={
+        withCerts
+          ? `נשק, אמר״ל, כוונת והכשרות · ${fullName(person)}`
+          : 'הציוד שלי — נשק, אמר״ל וכוונת'
+      }
+      body={
+        withCerts
+          ? 'סמל צוות מעדכן נשק, אמר״ל, כוונת והכשרות. שאר הפרטים שמורים למפקד החפ״ק ולמנהל המערכת.'
+          : 'הצ׳ים שאתה חתום עליהם — עדכן אותם כאן. ההסמכות והפרטים האישיים נרשמים על ידי המפקדים.'
+      }
       width={560}
       actions={
         <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
@@ -147,7 +157,9 @@ export function KitDialog({ open, person, onClose }: Props) {
         </Field>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div
+        style={{ display: withCerts ? 'flex' : 'none', flexDirection: 'column', gap: 6 }}
+      >
         <span style={{ fontSize: 12, color: 'var(--color-neutral-500)' }}>
           הסמכות אישיות — תאריך תפוגה (ריק = לא הוזן) · התרעה {db.settings.cert_alert_days} יום לפני
         </span>

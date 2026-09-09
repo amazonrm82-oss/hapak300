@@ -160,6 +160,8 @@ export function rolesFor(user: Person | null): string[] {
 
 export function canEditKitOf(db: Db, user: Person | null, target: Person): boolean {
   if (!user) return false;
+  // his own weapon, night vision and sight are his to keep straight
+  if (user.id === target.id) return true;
   if (user.is_admin) return true;
   if (target.is_admin) return false;
   return permsFor(db, user, null).canEditKit;

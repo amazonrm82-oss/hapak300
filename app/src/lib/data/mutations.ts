@@ -1132,7 +1132,15 @@ export interface KitForm {
  * either wipe it or be refused outright. The database allows him these columns
  * and nothing else, so this is what the screen sends.
  */
-export async function saveKit(pid: string, form: KitForm): Promise<void> {
+/**
+ * The kit on somebody's card: the weapon, the night vision, the sight — and,
+ * for whoever is entitled to them, the certifications.
+ *
+ * A fighter keeps his own serials up to date; the dates on his certifications
+ * are somebody else's to write. So `withCerts` is false on his own card, and
+ * the column is then not in the update at all rather than sent and refused.
+ */
+export async function saveKit(pid: string, form: KitForm, withCerts = true): Promise<void> {
   const certs = Object.fromEntries(
     Object.entries(form.certs).filter(([, v]) => v && /^\d{4}-\d{2}-\d{2}$/.test(v)),
   );
@@ -1145,7 +1153,7 @@ export async function saveKit(pid: string, form: KitForm): Promise<void> {
       nvg_serial: form.nvg_serial.trim(),
       sight: form.sight.trim(),
       sight_serial: form.sight_serial.trim(),
-      certs,
+      ...(withCerts ? { certs } : {}),
     })
     .eq('id', pid);
   check(error);

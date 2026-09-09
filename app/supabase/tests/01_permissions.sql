@@ -531,15 +531,14 @@ exception when others then
   raise notice '✅  70  לוחם נחסם משינוי הפרופיל הרפואי של עצמו';
 end $t$;
 
-do $t$ begin
-  update people set weapon_serial = 'זיוף' where id = me_id();
-  raise notice '❌  71  לוחם שינה לעצמו מספר נשק — כשל';
-exception when others then
-  raise notice '✅  71  לוחם נחסם משינוי מספר הנשק של עצמו';
-end $t$;
+-- הצ׳ שהוא חתום עליו הוא שלו לתחזק
+update people set weapon_serial = 'X2' where id = me_id();
+select case when (select weapon_serial from people_view where id = me_id()) = 'X2'
+            then '✅' else '❌' end || '  71  לוחם מעדכן את מספר הנשק של עצמו';
 
-select case when (select weapon_serial from people_view where id = me_id()) = 'X1'
-            then '✅' else '❌' end || '  72  הלוחם רואה את מספר הנשק של עצמו';
+update people set sight = 'מרס', sight_serial = 'S1' where id = me_id();
+select case when (select sight_serial from people_view where id = me_id()) = 'S1'
+            then '✅' else '❌' end || '  72  וגם את הכוונת שלו';
 -- addressed by name: this fighter cannot see anyone else's personal number
 -- either, so `where pn = …` would match nothing and prove nothing
 select case when (select weapon_serial from people_view where name = 'דניאל כץ') = ''
@@ -1386,5 +1385,43 @@ set role authenticated;
 
 select case when not exists (select 1 from people where role = 'מח״ט')
             then '✅' else '❌' end || '  148  ולוחם אינו ממנה את עצמו למח״ט';
+
+reset role; reset request.jwt.claim.sub;
+
+-- ════════ כל אחד מעדכן את הציוד של עצמו ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+set role authenticated;
+
+update people set weapon_serial = 'Z9', sight = 'מרס', sight_serial = 'S7' where id = me_id();
+select case when (select weapon_serial from people_view where id = me_id()) = 'Z9'
+             and (select sight_serial from people_view where id = me_id()) = 'S7'
+            then '✅' else '❌' end || '  149  לוחם מעדכן את הצ׳ים של עצמו';
+
+-- אבל לא את ההסמכות שלו, ולא את התפקיד
+do $t$ begin
+  update people set certs = '{"fire":"2030-01-01"}'::jsonb where id = me_id();
+exception when others then null;
+end $t$;
+select case when coalesce((select certs->>'fire' from people where id = me_id()), '') <> '2030-01-01'
+            then '✅' else '❌' end || '  150  ואינו כותב לעצמו הסמכות';
+
+do $t$ begin
+  update people set role = 'מפקד חפ״ק' where id = me_id();
+exception when others then null;
+end $t$;
+select case when (select role from people_view where id = me_id()) <> 'מפקד חפ״ק'
+            then '✅' else '❌' end || '  151  ואינו משנה לעצמו תפקיד';
+
+-- ולא נוגע בצ׳ של אחר
+do $t$ begin
+  update people set weapon_serial = 'X9' where name = 'תומר גל';
+exception when others then null;
+end $t$;
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+select case when coalesce((select weapon_serial from people_view where name = 'תומר גל'), '') <> 'X9'
+            then '✅' else '❌' end || '  152  ואינו נוגע בצ׳ של אחר';
 
 reset role; reset request.jwt.claim.sub;
