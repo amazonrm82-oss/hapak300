@@ -17,6 +17,8 @@ import { useApp } from '@/lib/data/provider';
 interface Props {
   open: boolean;
   training: TrainingFull | null; // null = new
+  /** A training to copy: the form opens as a new one, filled in from it. */
+  duplicateOf?: TrainingFull | null;
   week?: number;
   onClose: () => void;
 }
@@ -66,12 +68,40 @@ const proposeLogistics = (
 /** Nothing is chosen for the commander; he adds what the day needs. */
 const EMPTY_LOGISTICS: LogisticsDraft = { gear: [], vehicles: [], ammo: [], food: [] };
 
+/**
+ * The kit of one training, ready to be the kit of the next.
+ *
+ * The plan comes across; what happened on the day does not — nothing is
+ * returned or missing yet, no rounds have been fired, and no vehicle has a
+ * fault. The driver is left out on purpose: who drives is a decision for that
+ * day, and a licence in date last month may not be in date now.
+ */
+const copyLogistics = (t: TrainingFull): LogisticsDraft => ({
+  gear: t.gear.map((g) => ({ name: g.name, qty: g.qty, returned: false, missing: '', owner_id: null })),
+  vehicles: t.vehicles.map((v) => ({
+    type: v.type,
+    tz: v.tz,
+    driver_id: null,
+    seats: v.seats,
+    departure: v.departure,
+    fitness: v.fitness,
+    fault: '',
+  })),
+  ammo: t.ammo.map((a) => ({
+    weapon: a.weapon,
+    per_fighter: a.per_fighter,
+    allocated: a.allocated,
+    used: 0,
+  })),
+  food: t.food.map((x) => ({ name: x.name, qty: x.qty, unit: x.unit, note: x.note })),
+});
+
 /** What the gathering time would be if nobody sets one. */
 const suggestedDeparture = (start: string): string =>
   /^([01]\d|2[0-3]):[0-5]\d$/.test(start) ? addMinutes(start, -DEPARTURE_LEAD_MINUTES) : '';
 
 /** Every field the unit made mandatory before a training may be published. */
-export function TrainingFormDialog({ open, training, week = 1, onClose }: Props) {
+export function TrainingFormDialog({ open, training, duplicateOf = null, week = 1, onClose }: Props) {
   const { db, user, toast, refresh } = useApp();
   const router = useRouter();
   const [f, setF] = useState<TrainingForm | null>(null);
@@ -101,6 +131,29 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         safety: training.safety,
         notes: training.notes,
       });
+    } else if (duplicateOf) {
+      // Everything the day is made of, on a new date a week later. The date is
+      // the one thing that must not be inherited, and the commander is looking
+      // straight at it before he saves.
+      const d = duplicateOf;
+      setF({
+        topic_id: d.topic_id,
+        new_topic: '',
+        team_id: d.team_id,
+        date: addDays(d.date, 7),
+        start: d.start,
+        end: d.end,
+        location: d.location,
+        coords: d.coords,
+        commander_id: d.commander_id ?? '',
+        instructor_id: d.instructor_id ?? '',
+        freq: d.freq,
+        pickup: d.pickup,
+        departure: d.departure,
+        fire_mode: d.fire_mode,
+        safety: d.safety,
+        notes: d.notes,
+      });
     } else {
       const firstTopic = db.topics[0]?.id ?? 'setup';
       setF(
@@ -112,7 +165,7 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
       );
     }
     setLogi(null);
-  }, [open, training, db, week]);
+  }, [open, training, duplicateOf, db, week]);
 
   // A new training starts with nothing chosen. The system used to fill the kit
   // in by itself — three vehicles, ammunition by topic — and a list somebody
@@ -121,8 +174,15 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
   // proposal is still there, one button away, for whoever wants it.
   useEffect(() => {
     if (!open || !db || training) return;
-    setLogi((cur) => cur ?? EMPTY_LOGISTICS);
-  }, [open, db, training]);
+    // A copy is the exception: its whole point is that the kit comes with it.
+    // The driver is left out — who drives is a decision for that day, and a
+    // licence that was in date last month may not be in date now.
+    setLogi(
+      (cur) =>
+        cur ??
+        (duplicateOf ? copyLogistics(duplicateOf) : EMPTY_LOGISTICS),
+    );
+  }, [open, db, training, duplicateOf]);
 
   if (!open || !db || !user || !f) return null;
 
@@ -156,7 +216,23 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
         await refresh();
         toast('האימון עודכן — כל הצוות קיבל התראה');
       } else {
-        const id = await createTraining(db!, user!, { ...f!, ...cleanLogistics(logi) });
+        const id = await createTraining(db!, user!, {
+          ...f!,
+          ...cleanLogistics(logi),
+          // a copy brings the day's shape and its stations with it
+          ...(duplicateOf
+            ? {
+                day_blocks: duplicateOf.day_blocks.map((b) => ({ time: b.time, title: b.title })),
+                drills: duplicateOf.drills.map((d) => ({
+                  name: d.name,
+                  description: d.description,
+                  kind: d.kind,
+                  rounds: d.rounds,
+                  weight: d.weight,
+                })),
+              }
+            : {}),
+        });
         await refresh();
         toast('האימון נוצר ופורסם לצוות');
         if (id) router.push(`/trainings/${id}`);
@@ -173,11 +249,13 @@ export function TrainingFormDialog({ open, training, week = 1, onClose }: Props)
     <Dialog
       open
       onClose={onClose}
-      title={training ? 'עריכת אימון' : 'אימון חדש'}
+      title={training ? 'עריכת אימון' : duplicateOf ? 'שכפול אימון' : 'אימון חדש'}
       body={
         training
           ? 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות.'
-          : 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות. הציוד, הרכבים, התחמושת והמזון מתווספים למטה — מה שתוסיף הוא מה שהצוות יראה.'
+          : duplicateOf
+            ? 'הכול הועתק מהאימון הקודם — הציוד, הרכבים, התחמושת, מהלך היום והמקצים. בדוק את התאריך, שבץ נהגים, ושמור.'
+            : 'חובה: נושא, תאריך, שעות, מיקום, מפקד אימון, מדריך והוראות בטיחות. הציוד, הרכבים, התחמושת והמזון מתווספים למטה — מה שתוסיף הוא מה שהצוות יראה.'
       }
       actions={
         <>

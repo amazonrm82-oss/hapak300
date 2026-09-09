@@ -193,6 +193,9 @@ export interface TrainingForm {
   vehicles?: NewVehicle[];
   ammo?: NewAmmo[];
   food?: NewFood[];
+  /** Carried over when one training is copied from another. */
+  day_blocks?: { time: string; title: string }[];
+  drills?: DrillForm[];
 }
 
 /** Every field the unit made mandatory when publishing a training. */
@@ -230,6 +233,7 @@ function draftFor(db: Db, o: {
   vehicles?: NewVehicle[];
   ammo?: NewAmmo[];
   food?: NewFood[];
+  day_blocks?: { time: string; title: string }[];
 }) {
   // The gathering time is the commander's to set — a force that meets at the
   // armoury needs longer than one that meets at the gate. Ninety minutes before
@@ -271,7 +275,7 @@ function draftFor(db: Db, o: {
     departure,
     fire_mode: o.fire_mode ?? 'wet',
     notes: o.notes ?? '',
-    day_blocks: defaultDayBlocks(o.start, o.end, o.topic_id),
+    day_blocks: o.day_blocks ?? defaultDayBlocks(o.start, o.end, o.topic_id),
     ...logi,
   };
 }
@@ -313,6 +317,23 @@ export async function createTraining(db: Db, user: Person, f: TrainingForm): Pro
   const { data, error } = await sb().rpc('create_trainings', { drafts: [draft], replace_existing: false });
   check(error);
   const id = (data as string[])?.[0];
+
+  // The stations are not part of the draft the database builds a training from,
+  // so a copied training gets them here — the plan, never the results.
+  if (id && f.drills?.length) {
+    const { error: dErr } = await sb().from('drills').insert(
+      f.drills.map((d, i) => ({
+        training_id: id,
+        name: d.name,
+        description: d.description,
+        kind: d.kind,
+        rounds: d.rounds,
+        weight: d.weight,
+        sort: i,
+      })),
+    );
+    check(dErr);
+  }
 
   void pushNow();
 
@@ -930,6 +951,9 @@ export interface PersonForm {
   nvg_serial: string;
   medical_profile: string; // kept as text in the form; '' means not entered
   limitations: string;
+  /** A spell away from the unit; both empty means he is here. */
+  absent_from: string;
+  absent_to: string;
 }
 
 export async function savePerson(
@@ -980,7 +1004,12 @@ export async function savePerson(
       ? Number(form.medical_profile.trim())
       : null,
     limitations: form.limitations.trim(),
+    absent_from: form.absent_from || null,
+    absent_to: form.absent_from ? form.absent_to || null : null,
   };
+
+  if (row.absent_to && row.absent_from && row.absent_to < row.absent_from)
+    throw new Error('תאריך הסיום של ההיעדרות מוקדם מתאריך ההתחלה');
 
   if (row.medical_profile !== null && (row.medical_profile < 21 || row.medical_profile > 97))
     throw new Error('פרופיל רפואי חייב להיות בין 21 ל-97 (או ריק)');

@@ -1214,3 +1214,41 @@ reset role; reset request.jwt.claim.sub;
 select case when not (select essential_roles && array['מאבטח', 'נהג'] from settings limit 1)
              and (select essential_roles @> array['חובש'] from settings limit 1)
             then '✅' else '❌' end || '  134  מאבטח ונהג אינם ברשימת החובה, חובש כן';
+
+-- ════════ היעדרות עם תאריכים, וסוג האימון ביצירה ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+-- נוצר בפקודה נפרדת: שאילתה אינה רואה שורה שנוצרה בתוכה
+select create_trainings(jsonb_build_array(jsonb_build_object(
+  'team_id','a','topic_id','setup','date',(current_date+35)::text,
+  'start_time','07:00','end_time','15:00','location','שטח היעדרות',
+  'status','published','fire_mode','dry')), false);
+
+select case when (select fire_mode from trainings where location = 'שטח היעדרות') = 'dry'
+            then '✅' else '❌' end || '  135  אימון יבש נוצר יבש (ולא ״רטוב״ כברירת מחדל)';
+
+-- אותו אימון, פעמיים: פעם כשהלוחם בקורס באותו יום, ופעם כשלא
+update people set absent_from = current_date + 34, absent_to = current_date + 36
+ where id = (select id from people_view where name = 'איתי רוזן');
+
+select case when not exists (
+         select 1 from training_participants(
+           (select id from trainings where location = 'שטח היעדרות')) p
+          where p.name = 'איתי רוזן')
+            then '✅' else '❌' end || '  136  מי שבהיעדרות אינו נספר על אימון בתוך הטווח';
+
+update people set absent_from = current_date + 60, absent_to = current_date + 70
+ where id = (select id from people_view where name = 'איתי רוזן');
+
+select case when exists (
+         select 1 from training_participants(
+           (select id from trainings where location = 'שטח היעדרות')) p
+          where p.name = 'איתי רוזן')
+            then '✅' else '❌' end || '  137  ומחוץ לטווח הוא על המצבת כרגיל';
+
+update people set absent_from = null, absent_to = null
+ where id = (select id from people_view where name = 'איתי רוזן');
+
+reset role; reset request.jwt.claim.sub;

@@ -9,10 +9,18 @@ import { PersonDialog } from '@/components/dialogs/PersonDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { Avatar, EmptyState, Field, ScoreBar, SectionCard, Tag } from '@/components/ui/bits';
 import { certAlerts } from '@/lib/core/alerts';
+import { fmtShort } from '@/lib/core/dates';
 import { RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
 import { canEditKitOf, canEditPerson, permsFor, roleLabel } from '@/lib/core/permissions';
 import { readinessOf } from '@/lib/core/readiness';
-import { fullName, personById, rankSort, teamMembers, topicName } from '@/lib/core/selectors';
+import {
+  absentOn,
+  fullName,
+  personById,
+  rankSort,
+  teamMembers,
+  topicName,
+} from '@/lib/core/selectors';
 import type { Person, TeamKey } from '@/lib/core/types';
 import { decideJoinRequest, quickAddPerson } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
@@ -338,6 +346,18 @@ export default function TeamsPage() {
                           {p.status !== 'active' && (
                             <Tag style={{ fontSize: 10, padding: '1px 6px' }}>
                               מושבת{p.status_note ? ` · ${p.status_note}` : ''}
+                            </Tag>
+                          )}
+                          {/* a spell that has not started yet is worth seeing too —
+                              it is what a commander plans the next training around */}
+                          {absentOn(p, today) && (
+                            <Tag style={{ fontSize: 10, padding: '1px 6px' }}>
+                              בהיעדרות{p.absent_to ? ` עד ${fmtShort(p.absent_to)}` : ''}
+                            </Tag>
+                          )}
+                          {!absentOn(p, today) && p.absent_from && p.absent_from > today && (
+                            <Tag style={{ fontSize: 10, padding: '1px 6px' }}>
+                              היעדרות מ-{fmtShort(p.absent_from)}
                             </Tag>
                           )}
                           {p.id === user.id && (

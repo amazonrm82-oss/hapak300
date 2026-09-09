@@ -57,6 +57,7 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
   const [markPerson, setMarkPerson] = useState<string | null>(null);
   const [marking, setMarking] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [inviteRole, setInviteRole] = useState<InviteRole | null>(null);
   const [postponeOpen, setPostponeOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -155,6 +156,17 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
                 ביטול
               </button>
             </>
+          )}
+          {/* the same day again, on another date: the kit, the schedule and the
+              stations come across — only the results and the drivers do not */}
+          {perms.canCreate && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setCopyOpen(true)}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              שכפול אימון
+            </button>
           )}
           <button className="btn btn-secondary" onClick={() => share(orderText(db, t))} style={{ whiteSpace: 'nowrap' }}>
             שיתוף פקודת אימון
@@ -278,6 +290,12 @@ export default function TrainingPage({ params }: { params: { id: string } }) {
       )}
 
       <TrainingFormDialog open={editOpen} training={t} onClose={() => setEditOpen(false)} />
+      <TrainingFormDialog
+        open={copyOpen}
+        training={null}
+        duplicateOf={t}
+        onClose={() => setCopyOpen(false)}
+      />
       <InviteDialog training={inviteRole ? t : null} role={inviteRole} onClose={() => setInviteRole(null)} />
 
       <PostponeDialog

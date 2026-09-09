@@ -53,14 +53,31 @@ export const statusLabel = (t: Pick<Training, 'status'>) => TRAINING_STATUS[t.st
  *  every training — סדיר trains with א׳ and ב׳ and never on its own. */
 export function participants(
   db: Db,
-  t: Pick<Training, 'team_id'> & { guests?: { person_id: string }[] },
+  t: Pick<Training, 'team_id' | 'date'> & { guests?: { person_id: string }[] },
 ): Person[] {
   // a guest is attached to this training by a commander — making up one he
   // missed, or lent to the force for the day — and counts like anyone else
   const guests = new Set((t.guests ?? []).map((g) => g.person_id));
   return db.people
-    .filter((p) => isRostered(db, p, t.team_id) || (guests.has(p.id) && p.status === 'active'))
+    .filter(
+      (p) =>
+        !absentOn(p, t.date) &&
+        (isRostered(db, p, t.team_id) || (guests.has(p.id) && p.status === 'active')),
+    )
     .sort(rankSort);
+}
+
+/**
+ * Is this fighter away from the unit on that date?
+ *
+ * A course, a hospital, leave abroad — a spell nobody expects him back from
+ * before it ends. He is not on the roster of a training inside it: not counted
+ * towards the minimum, not reminded, and not scored zero for missing it. An
+ * empty end date means it is still open.
+ */
+export function absentOn(p: Pick<Person, 'absent_from' | 'absent_to'>, date: string): boolean {
+  if (!p.absent_from || !date) return false;
+  return date >= p.absent_from && (!p.absent_to || date <= p.absent_to);
 }
 
 /** True when this person takes part in a training held by `teamId`. */

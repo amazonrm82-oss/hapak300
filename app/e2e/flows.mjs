@@ -92,6 +92,21 @@ const attendanceTab = async () => {
 };
 
 /**
+ * Answers the entry prompt until it stops coming back.
+ *
+ * More than one training can be open for the same person — the copy made
+ * further up is one — and each is asked about in turn. Answering them all is
+ * what a fighter does on the way in, and it clears the modal for the checks
+ * that follow.
+ */
+const answerPrompts = async (limit = 4) => {
+  for (let i = 0; i < limit && (await has('נקבע לך אימון')); i++) {
+    await page.locator('button:text-is("מגיע")').first().click();
+    await settle(1800);
+  }
+};
+
+/**
  * Clicks the first button whose label contains `label`.
  *
  * Waits out any button that reads ״רגע…״ first: while a request is in flight
@@ -423,6 +438,71 @@ try {
     await settle(1000);
     check('לשונית הנוכחות מציגה את הכוח', await has('דוד בדיקה'));
     check('ולוחם סדיר מופיע באימון של צוות א׳', await has('דוד בדיקה'));
+
+    // ── היעדרות: מי שבקורס יורד מהמצבת של אותו יום ──
+    //
+    // The roster is where this has to show, because the roster is what the
+    // reminders, the count and the scores are all made of.
+    await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+    await settle(1200);
+    // his row is the nearest ancestor div that carries a button of its own
+    const rowOf = (name) =>
+      page.getByText(name).first().locator('xpath=ancestor::div[.//button][1]');
+    await rowOf('דוד בדיקה').locator('button:has-text("עריכה")').first().click();
+    await settle(900);
+    const away = new Date(today.getTime() + 5 * 864e5).toISOString().slice(0, 10);
+    const back = new Date(today.getTime() + 9 * 864e5).toISOString().slice(0, 10);
+    const dates = page.locator('[role="dialog"] input[type="date"]');
+    await dates.nth(0).fill(away);
+    await dates.nth(1).fill(back);
+    await click('שמירה');
+    await settle(2200);
+    check('היעדרות נשמרה ומסומנת ברשימת הכוח', await has('היעדרות'));
+
+    await page.goto(trainingUrl, { waitUntil: 'networkidle' });
+    await settle(1600);
+    await attendanceTab();
+    await settle(1000);
+    check(
+      'ומי שבהיעדרות יורד מהמצבת של אותו אימון',
+      !(await page.locator('tbody tr').filter({ hasText: 'דוד בדיקה' }).count()),
+    );
+
+    // and back on it the moment the absence is cleared
+    await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
+    await settle(1200);
+    await rowOf('דוד בדיקה').locator('button:has-text("עריכה")').first().click();
+    await settle(900);
+    await page.locator('[role="dialog"] input[type="date"]').nth(0).fill('');
+    await click('שמירה');
+    await settle(2200);
+    await page.goto(trainingUrl, { waitUntil: 'networkidle' });
+    await settle(1600);
+    await attendanceTab();
+    await settle(1000);
+    check(
+      'ומשנמחקה — הוא חוזר למצבת',
+      (await page.locator('tbody tr').filter({ hasText: 'דוד בדיקה' }).count()) > 0,
+    );
+
+    // ── שכפול אימון ──
+    //
+    // The same day again on another date: the kit, the schedule and the
+    // stations come across, and the results do not.
+    await click('שכפול אימון');
+    await settle(1200);
+    check('טופס השכפול נפתח מלא', await has('הכול הועתק מהאימון הקודם'));
+    const copyRows = await page
+      .locator('[role="dialog"] button[aria-label="הסרת שורה"]')
+      .count();
+    check('והציוד והרכבים כבר בתוכו', copyRows > 0, `${copyRows} שורות`);
+    await click('שמירה ופרסום');
+    await settle(3000);
+    check('האימון המשוכפל נוצר', page.url().includes('/trainings/') && page.url() !== trainingUrl);
+    await click('מקצים');
+    await settle(1200);
+    check('והמקצים הועתקו איתו', await has('ירי בעמידה'));
+    check('בלי התוצאות של הקודם', !(await has('85.0')));
   }
 
   // ── every screen renders ──
@@ -515,8 +595,17 @@ try {
   await settle(1500);
   check('לוחם רגיל נכנס למערכת בקוד שבחר', !page.url().includes('/login'));
 
-  // his commander already marked him, so there is nothing left to ask him
-  check('ואינו נשאל שוב על אימון שכבר סומן עבורו', !(await has('נקבע לך אימון')));
+  // His commander already marked him for the first training, so the entry
+  // prompt must not name that date again. It may well ask about the copy made
+  // further up — that one nobody has heard from him on.
+  const [yy, mm, dd] = future.split('-');
+  check(
+    'ואינו נשאל שוב על אימון שכבר סומן עבורו',
+    !(await has(`${dd}.${mm}.${yy}`)) || !(await has('נקבע לך אימון')),
+  );
+  // he is still owed an answer on the copy; give it, so nothing covers the
+  // screen for the checks below
+  await answerPrompts();
 
   await page.goto(`${BASE}/schedule`, { waitUntil: 'networkidle' });
   await settle(1200);
@@ -571,8 +660,7 @@ try {
   // nobody has answered for him, and a training was published to his team —
   // so the app asks on the way in, which is the point of the prompt
   check('והמערכת שואלת אותו אם הוא מגיע לאימון', await has('נקבע לך אימון'));
-  await page.locator('button:text-is("מגיע")').first().click();
-  await settle(1800);
+  await answerPrompts();
   check('ותשובתו נשמרת', !(await has('נקבע לך אימון')));
 
   // and it is his answer once: changing it is his commander's to do

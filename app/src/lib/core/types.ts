@@ -83,6 +83,15 @@ export interface Person {
   nvg_serial: string;
   /** May be assigned to drive, whatever else he does in the force. */
   is_driver: boolean;
+  /**
+   * A spell away from the unit — a course, a hospital, leave abroad.
+   *
+   * Between these two dates he is not counted on a training, not reminded
+   * about one, and not scored zero for missing it. `absent_to` empty means
+   * open-ended: from that date until somebody says otherwise.
+   */
+  absent_from: string | null;
+  absent_to: string | null;
   /** Israeli medical profile, 21–97, or null when it has not been entered. */
   medical_profile: number | null;
   limitations: string;

@@ -239,6 +239,8 @@ export async function loadDb(): Promise<Db> {
           ...p,
           pn: (p.pn as string) ?? '',
           is_driver: !!p.is_driver,
+          absent_from: (p.absent_from as string) ?? null,
+          absent_to: (p.absent_to as string) ?? null,
           nvg: (p.nvg as string) ?? '',
           nvg_serial: (p.nvg_serial as string) ?? '',
           qual: (p.qual as string[]) ?? [],

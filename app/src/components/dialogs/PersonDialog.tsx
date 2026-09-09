@@ -39,6 +39,8 @@ const emptyForm = (): PersonForm => ({
   nvg_serial: '',
   medical_profile: '',
   limitations: '',
+  absent_from: '',
+  absent_to: '',
 });
 
 /**
@@ -77,6 +79,8 @@ export function PersonDialog({ open, person, onClose }: Props) {
         nvg_serial: person.nvg_serial ?? '',
         medical_profile: person.medical_profile ? String(person.medical_profile) : '',
         limitations: person.limitations ?? '',
+        absent_from: person.absent_from ?? '',
+        absent_to: person.absent_to ?? '',
       });
     } else {
       setF(emptyForm());
@@ -309,6 +313,25 @@ export function PersonDialog({ open, person, onClose }: Props) {
               placeholder="למשל: פטור מריצה עד 01/2027"
             />
           </Field>
+          <Field label="היעדרות — מתאריך">
+            <input className="input" type="date" value={f.absent_from} onChange={set('absent_from')} />
+          </Field>
+          <Field label="ועד תאריך (ריק = פתוח)">
+            <input
+              className="input"
+              type="date"
+              value={f.absent_to}
+              onChange={set('absent_to')}
+              disabled={!f.absent_from}
+            />
+          </Field>
+          <span
+            style={{ gridColumn: 'span 2', fontSize: 12, color: 'var(--color-neutral-500)', marginTop: -4 }}
+          >
+            קורס, אשפוז או חו״ל. בטווח הזה הוא אינו נספר על אימון, אינו מקבל תזכורות
+            ואינו מקבל אפס על אימון שלא היה יכול להגיע אליו.
+          </span>
+
           {f.status === 'inactive' && (
             <Field label="סיבת ההשבתה">
               <input

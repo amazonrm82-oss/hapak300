@@ -8,7 +8,7 @@
 -- בלי public בנתיב החיפוש, ובלי הקידומת הוא לא מוצא את הטבלאות.
 --
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
--- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b
+-- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06
 -- ═══════════════════════════════════════════════════════════════════════════
 
 with checks(sort, patch, what, ok) as (values
@@ -111,7 +111,19 @@ with checks(sort, patch, what, ok) as (values
    not has_table_privilege('anon', 'public.people_view', 'select')
    and not has_table_privilege('anon', 'public.trainings_view', 'select')),
   (33, '05', 'אבל בקשת הצטרפות מבחוץ עדיין נכנסת',
-   has_table_privilege('anon', 'public.join_requests', 'insert'))
+   has_table_privilege('anon', 'public.join_requests', 'insert')),
+
+  -- ── patch-06 ──
+  (34, '06', 'היעדרות עם תאריכים — קורס, אשפוז, חו״ל',
+   exists (select 1 from information_schema.columns
+            where table_name = 'people_view' and column_name = 'absent_from')),
+  (35, '06', 'ומי שבהיעדרות יורד מהמצבת של אותו אימון',
+   to_regprocedure('public.is_absent_on(uuid, date)') is not null
+   and (select pg_get_functiondef(oid) from pg_proc where proname = 'training_participants')
+       like '%is_absent_on%'),
+  (36, '06', 'סוג האימון (יבש/חלקי/רטוב) נשמר גם ביצירה',
+   (select pg_get_functiondef(oid) from pg_proc where proname = 'create_trainings')
+   like '%fire_mode%')
 )
 
 select
@@ -141,6 +153,8 @@ select case
    and exists (select 1 from information_schema.columns
                 where table_name = 'trainings_view' and column_name = 'fire_mode')
    and not has_table_privilege('anon', 'public.people_view', 'select')
+   and exists (select 1 from information_schema.columns
+                where table_name = 'people_view' and column_name = 'absent_from')
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";
