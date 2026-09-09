@@ -449,13 +449,17 @@ export function ammoHTML(db: Db, t: TrainingFull): string {
 
 // ── צל״ם: the kit each fighter signs for ───────────────────────────────────
 
+/** How many of the six kit fields this fighter is still missing. */
+const kitGaps = (p: Person): number =>
+  [p.weapon, p.weapon_serial, p.nvg, p.nvg_serial, p.sight, p.sight_serial].filter((v) => !v).length;
+
 /**
  * Who holds what, by serial.
  *
  * A צל״ם list used to be assembled by walking the team and asking. Every number
- * on it is already on the cards — the weapon, its serial, the night vision and
- * its serial — so the list is a matter of printing what is known, and the gaps
- * are the point: a blank serial is a fighter nobody has signed for yet.
+ * on it is already on the cards — the weapon, its serial, the night vision, the
+ * sight and their serials — so the list is a matter of printing what is known,
+ * and the gaps are the point: a blank serial is a fighter nobody has signed for.
  */
 export function kitText(db: Db, people: Person[], scope: string): string {
   const lines = [`דו״ח צל״ם — ${db.settings.unit_name}`, scope, '', ...people.map((p) => {
@@ -463,13 +467,12 @@ export function kitText(db: Db, people: Person[], scope: string): string {
       `${fullName(p)}${p.role ? ` · ${p.role}` : ''}`,
       `  נשק: ${p.weapon || '—'} · צ׳ ${p.weapon_serial || '—'}`,
       `  אמר״ל: ${p.nvg || '—'} · צ׳ ${p.nvg_serial || '—'}`,
+      `  כוונת: ${p.sight || '—'} · צ׳ ${p.sight_serial || '—'}`,
     ];
     return parts.join('\n');
   })];
 
-  const missing = people.filter(
-    (p) => !p.weapon || !p.weapon_serial || !p.nvg || !p.nvg_serial,
-  ).length;
+  const missing = people.filter((p) => kitGaps(p) > 0).length;
   lines.push('', `${people.length} לוחמים`);
   if (missing) lines.push(`${missing} מהם חסרים פרט אחד או יותר`);
   return lines.join('\n');
@@ -484,16 +487,18 @@ export function kitHTML(db: Db, people: Person[], scope: string): string {
       return (
         `<tr><td>${esc(fullName(p))}</td><td>${esc(teamName(db, p.team_id))}</td><td>${esc(p.role)}</td>` +
         `<td>${gap(p.weapon)}</td><td>${gap(p.weapon_serial)}</td>` +
-        `<td>${gap(p.nvg)}</td><td>${gap(p.nvg_serial)}</td></tr>`
+        `<td>${gap(p.nvg)}</td><td>${gap(p.nvg_serial)}</td>` +
+        `<td>${gap(p.sight)}</td><td>${gap(p.sight_serial)}</td></tr>`
       );
     })
     .join('');
-  const missing = people.filter((p) => !p.weapon || !p.weapon_serial || !p.nvg || !p.nvg_serial).length;
+  const missing = people.filter((p) => kitGaps(p) > 0).length;
   return (
     `<h1>דו״ח צל״ם · ${esc(db.settings.unit_name)}</h1>` +
     `<h2>${esc(scope)} · ${people.length} לוחמים</h2>` +
     `<table><thead><tr><th>שם ודרגה</th><th>צוות</th><th>תפקיד</th>` +
-    `<th>סוג נשק</th><th>מספר נשק</th><th>סוג אמר״ל</th><th>מספר אמר״ל</th></tr></thead>` +
+    `<th>סוג נשק</th><th>מספר נשק</th><th>סוג אמר״ל</th><th>מספר אמר״ל</th>` +
+    `<th>סוג כוונת</th><th>מספר כוונת</th></tr></thead>` +
     `<tbody>${body}</tbody></table>` +
     (missing
       ? `<p class="muted">${missing} לוחמים חסרים פרט אחד או יותר — הם מסומנים ״חסר״ בטבלה.</p>`

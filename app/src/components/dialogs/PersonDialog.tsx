@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { CERT_TYPES, NVG_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
+import { CERT_TYPES, NVG_TYPES, SIGHT_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
 import { canEditPerson, canGrantRights, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
@@ -37,6 +37,8 @@ const emptyForm = (): PersonForm => ({
   weapon_serial: '',
   nvg: '',
   nvg_serial: '',
+  sight: '',
+  sight_serial: '',
   medical_profile: '',
   limitations: '',
   absent_from: '',
@@ -77,6 +79,8 @@ export function PersonDialog({ open, person, onClose }: Props) {
         weapon_serial: person.weapon_serial ?? '',
         nvg: person.nvg ?? '',
         nvg_serial: person.nvg_serial ?? '',
+        sight: person.sight ?? '',
+        sight_serial: person.sight_serial ?? '',
         medical_profile: person.medical_profile ? String(person.medical_profile) : '',
         limitations: person.limitations ?? '',
         absent_from: person.absent_from ?? '',
@@ -291,6 +295,18 @@ export function PersonDialog({ open, person, onClose }: Props) {
           </Field>
           <Field label="מספר אמר״ל (צ׳)">
             <input className="input tabnum" value={f.nvg_serial} onChange={set('nvg_serial')} />
+          </Field>
+
+          <Field label="כוונת">
+            <input className="input" list="hapak-sight-full" value={f.sight} onChange={set('sight')} />
+            <datalist id="hapak-sight-full">
+              {SIGHT_TYPES.map((x) => (
+                <option key={x} value={x} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="מספר כוונת (צ׳)">
+            <input className="input tabnum" value={f.sight_serial} onChange={set('sight_serial')} />
           </Field>
 
           <Field label="פרופיל רפואי (21–97)">

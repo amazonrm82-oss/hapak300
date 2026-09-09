@@ -81,6 +81,9 @@ export interface Person {
   /** Night vision signed for by this fighter, and its serial. */
   nvg: string;
   nvg_serial: string;
+  /** The sight on his weapon, and its serial — both go on the צל״ם list. */
+  sight: string;
+  sight_serial: string;
   /** May be assigned to drive, whatever else he does in the force. */
   is_driver: boolean;
   /**

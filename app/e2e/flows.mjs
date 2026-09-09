@@ -682,6 +682,8 @@ try {
   await page.locator('input[placeholder="הצ׳ של הנשק"]').fill('5512345');
   await page.locator('input[placeholder="סוג האמר״ל"]').fill('אמר״ל 4×');
   await page.locator('input[placeholder="הצ׳ של האמר״ל"]').fill('7788990');
+  await page.locator('input[placeholder="סוג הכוונת"]').fill('מפרו לייט');
+  await page.locator('input[placeholder="הצ׳ של הכוונת"]').fill('4433221');
   await click('שמירה');
   await settle(2000);
   await page.goto(`${BASE}/teams`, { waitUntil: 'networkidle' });
@@ -690,15 +692,21 @@ try {
   await settle(900);
   const savedSerial = await page.locator('input[placeholder="הצ׳ של הנשק"]').inputValue();
   const savedNvg = await page.locator('input[placeholder="הצ׳ של האמר״ל"]').inputValue();
+  const savedSight = await page.locator('input[placeholder="הצ׳ של הכוונת"]').inputValue();
   check('ומספר הנשק שרשם נשמר וחזר', savedSerial === '5512345');
   check('וגם האמר״ל', savedNvg === '7788990');
+  check('וגם הכוונת', savedSight === '4433221', savedSight);
   await page.locator('button[aria-label="סגירה"], button:has-text("✕")').first().click();
   await settle(600);
 
   await click('דו״ח צל״ם');
   await settle(1200);
   const kitReport = await page.locator('[role="dialog"] textarea').inputValue();
-  check('ומוציא דו״ח צל״ם לצוות שלו', kitReport.includes('7788990') && kitReport.includes('אמר״ל'));
+  check(
+    'ומוציא דו״ח צל״ם לצוות שלו',
+    kitReport.includes('7788990') && kitReport.includes('אמר״ל'),
+  );
+  check('ובתוכו גם הכוונת והצ׳ שלה', kitReport.includes('כוונת') && kitReport.includes('4433221'));
   check(
     'שאין בו דו״ח של כל היחידה',
     (await page.locator('button:has-text("דו״ח צל״ם — כל היחידה")').count()) === 0,

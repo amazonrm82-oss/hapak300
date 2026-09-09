@@ -243,6 +243,8 @@ export async function loadDb(): Promise<Db> {
           absent_to: (p.absent_to as string) ?? null,
           nvg: (p.nvg as string) ?? '',
           nvg_serial: (p.nvg_serial as string) ?? '',
+          sight: (p.sight as string) ?? '',
+          sight_serial: (p.sight_serial as string) ?? '',
           qual: (p.qual as string[]) ?? [],
           certs: (p.certs as Person['certs']) ?? {},
           notif: (p.notif as Person['notif']) ?? {

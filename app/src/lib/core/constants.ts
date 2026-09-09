@@ -107,6 +107,21 @@ export const WEAPONS = [
   'חק״ם',
 ] as const;
 
+/**
+ * The sights a fighter signs for. Suggestions, not a closed list — the field is
+ * free text with these behind it, because a unit gets whatever it gets.
+ */
+export const SIGHT_TYPES = [
+  'מפרו לייט',
+  'M5',
+  'מרס',
+  'טרייג׳יקון',
+  'הולוגרפית',
+  'כוונת לילה',
+  'כוונת ברזל',
+  'טלסקופית',
+] as const;
+
 /** Night-vision devices the unit holds. Free text is allowed — this is the shortcut. */
 export const NVG_TYPES = [
   'אמר״ל 1×',

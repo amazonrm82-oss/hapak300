@@ -1252,3 +1252,25 @@ update people set absent_from = null, absent_to = null
  where id = (select id from people_view where name = 'איתי רוזן');
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ כוונת אישית ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+update people set sight = 'מפרו לייט', sight_serial = '778899'
+ where id = (select id from people_view where name = 'דניאל כץ');
+
+select case when (select sight from people_view where name = 'דניאל כץ') = 'מפרו לייט'
+             and (select sight_serial from people_view where name = 'דניאל כץ') = '778899'
+            then '✅' else '❌' end || '  138  כוונת וצ׳ נשמרים ומגיעים למסך';
+
+-- הצ׳ מוסתר מלוחם אחר, כמו הצ׳ של הנשק והאמר״ל
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+set role authenticated;
+
+select case when coalesce((select sight_serial from people_view where name = 'דניאל כץ'), '') = ''
+            then '✅' else '❌' end || '  139  וצ׳ הכוונת מוסתר מלוחם אחר';
+
+reset role; reset request.jwt.claim.sub;

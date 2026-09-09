@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
-import { CERT_TYPES, NVG_TYPES } from '@/lib/core/constants';
+import { CERT_TYPES, NVG_TYPES, SIGHT_TYPES } from '@/lib/core/constants';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
 import { saveKit, type KitForm } from '@/lib/data/mutations';
@@ -25,7 +25,15 @@ interface Props {
  */
 export function KitDialog({ open, person, onClose }: Props) {
   const { db, toast, refresh } = useApp();
-  const [f, setF] = useState<KitForm>({ weapon: '', weapon_serial: '', nvg: '', nvg_serial: '', certs: {} });
+  const [f, setF] = useState<KitForm>({
+    weapon: '',
+    weapon_serial: '',
+    nvg: '',
+    nvg_serial: '',
+    sight: '',
+    sight_serial: '',
+    certs: {},
+  });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -35,6 +43,8 @@ export function KitDialog({ open, person, onClose }: Props) {
       weapon_serial: person.weapon_serial ?? '',
       nvg: person.nvg ?? '',
       nvg_serial: person.nvg_serial ?? '',
+      sight: person.sight ?? '',
+      sight_serial: person.sight_serial ?? '',
       certs: Object.fromEntries(CERT_TYPES.map(([k]) => [k, person.certs[k] ?? ''])),
     });
   }, [open, person]);
@@ -111,6 +121,28 @@ export function KitDialog({ open, person, onClose }: Props) {
             value={f.nvg_serial}
             onChange={(e) => setF((s) => ({ ...s, nvg_serial: e.target.value }))}
             placeholder="הצ׳ של האמר״ל"
+          />
+        </Field>
+        <Field label="כוונת">
+          <input
+            className="input"
+            list="hapak-sight"
+            value={f.sight}
+            onChange={(e) => setF((s) => ({ ...s, sight: e.target.value }))}
+            placeholder="סוג הכוונת"
+          />
+          <datalist id="hapak-sight">
+            {SIGHT_TYPES.map((x) => (
+              <option key={x} value={x} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="מספר כוונת">
+          <input
+            className="input tabnum"
+            value={f.sight_serial}
+            onChange={(e) => setF((s) => ({ ...s, sight_serial: e.target.value }))}
+            placeholder="הצ׳ של הכוונת"
           />
         </Field>
       </div>

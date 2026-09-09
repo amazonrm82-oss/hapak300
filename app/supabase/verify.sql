@@ -8,7 +8,7 @@
 -- בלי public בנתיב החיפוש, ובלי הקידומת הוא לא מוצא את הטבלאות.
 --
 -- כל שורה שמסומנת ❌ אומרת שאחד הקבצים לא הורץ או נפל באמצע. הסדר הנכון:
--- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06
+-- patch-01 → patch-02 → patch-03a → patch-03b → patch-04 → patch-05 → patch-05b → patch-06 → patch-07
 -- ═══════════════════════════════════════════════════════════════════════════
 
 with checks(sort, patch, what, ok) as (values
@@ -123,7 +123,15 @@ with checks(sort, patch, what, ok) as (values
        like '%is_absent_on%'),
   (36, '06', 'סוג האימון (יבש/חלקי/רטוב) נשמר גם ביצירה',
    (select pg_get_functiondef(oid) from pg_proc where proname = 'create_trainings')
-   like '%fire_mode%')
+   like '%fire_mode%'),
+
+  -- ── patch-07 ──
+  (37, '07', 'כוונת אישית וצ׳ שלה',
+   exists (select 1 from information_schema.columns
+            where table_name = 'people_view' and column_name = 'sight_serial')),
+  (38, '07', 'וסמל הצוות רשאי לרשום אותה',
+   (select pg_get_functiondef(oid) from pg_proc where proname = 'guard_people_self_edit')
+   like '%sight_serial%')
 )
 
 select
@@ -155,6 +163,8 @@ select case
    and not has_table_privilege('anon', 'public.people_view', 'select')
    and exists (select 1 from information_schema.columns
                 where table_name = 'people_view' and column_name = 'absent_from')
+   and exists (select 1 from information_schema.columns
+                where table_name = 'people_view' and column_name = 'sight_serial')
   then '✅ הכול ירד. המערכת מעודכנת.'
   else '❌ משהו חסר — ראה את השורות המסומנות למעלה.'
 end as "סיכום";

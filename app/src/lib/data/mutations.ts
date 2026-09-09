@@ -949,6 +949,8 @@ export interface PersonForm {
   weapon_serial: string;
   nvg: string;
   nvg_serial: string;
+  sight: string;
+  sight_serial: string;
   medical_profile: string; // kept as text in the form; '' means not entered
   limitations: string;
   /** A spell away from the unit; both empty means he is here. */
@@ -999,6 +1001,8 @@ export async function savePerson(
     weapon_serial: form.weapon_serial.trim(),
     nvg: form.nvg.trim(),
     nvg_serial: form.nvg_serial.trim(),
+    sight: form.sight.trim(),
+    sight_serial: form.sight_serial.trim(),
     // 21–97 is the Israeli scale; anything else is treated as not entered
     medical_profile: /^\d{2}$/.test(form.medical_profile.trim())
       ? Number(form.medical_profile.trim())
@@ -1079,6 +1083,8 @@ export interface KitForm {
   weapon_serial: string;
   nvg: string;
   nvg_serial: string;
+  sight: string;
+  sight_serial: string;
   certs: Record<string, string>;
 }
 
@@ -1101,6 +1107,8 @@ export async function saveKit(pid: string, form: KitForm): Promise<void> {
       weapon_serial: form.weapon_serial.trim(),
       nvg: form.nvg.trim(),
       nvg_serial: form.nvg_serial.trim(),
+      sight: form.sight.trim(),
+      sight_serial: form.sight_serial.trim(),
       certs,
     })
     .eq('id', pid);
