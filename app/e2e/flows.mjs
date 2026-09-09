@@ -560,6 +560,17 @@ try {
   await settle(400);
   await page.locator('button').filter({ hasText: 'דוד בדיקה' }).first().click();
   await settle(500);
+
+  // somebody who is not in the system at all still rides in the vehicle
+  await click('מי שאינו במערכת');
+  await settle(700);
+  await page.locator('[role="dialog"] input').nth(0).fill('סמל אורח מיחידה אחרת');
+  await page.locator('[role="dialog"] input').nth(1).fill('7009988');
+  await page.locator('[role="dialog"] input').nth(2).fill('מאבטח');
+  await click('הוסף לרכב');
+  await settle(900);
+  check('אפשר להוסיף לנפ״ק מי שאינו במערכת', await has('סמל אורח מיחידה אחרת'));
+
   await click('נפק ושלח בוואטסאפ');
   await settle(2600);
   check('הנפ״ק הוצא ונשמר בארכיון', await has('ארכיון נפ״ק (1)'), await text().then((x) => x.slice(0, 80)));

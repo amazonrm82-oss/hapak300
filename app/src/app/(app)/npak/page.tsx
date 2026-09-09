@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useShareOrder } from '@/components/dialogs/TextDialog';
-import { EmptyState, SectionCard } from '@/components/ui/bits';
+import { Dialog } from '@/components/ui/Dialog';
+import { EmptyState, Field, SectionCard } from '@/components/ui/bits';
 import { canDrive } from '@/lib/core/alerts';
 import { fmtFull } from '@/lib/core/dates';
 import { npakText } from '@/lib/core/exports';
 import { permsFor } from '@/lib/core/permissions';
 import { fullName, personById, rankSort } from '@/lib/core/selectors';
-import type { Npak, NpakRow, Person } from '@/lib/core/types';
+import type { Npak, NpakRow, NpakSeat, Person } from '@/lib/core/types';
 import { issueNpak } from '@/lib/data/mutations';
 import { useApp } from '@/lib/data/provider';
 
@@ -19,6 +20,8 @@ interface Draft {
   seats: number;
   driver_id: string;
   people: string[];
+  /** Written in by hand: somebody who is not in the system at all. */
+  extra: NpakSeat[];
 }
 
 /**
@@ -44,6 +47,8 @@ export default function NpakPage() {
   const { toWhatsApp, dialog } = useShareOrder((m) => toast(m));
   const [rows, setRows] = useState<Draft[]>([]);
   const [busy, setBusy] = useState(false);
+  // the form for somebody who is not in the system: row index, and his details
+  const [manual, setManual] = useState<{ row: number } & NpakSeat | null>(null);
 
   if (!db || !user) return null;
 
@@ -80,6 +85,7 @@ export default function NpakPage() {
         seats: v?.seats ?? 6,
         driver_id: '',
         people: [],
+        extra: [],
       },
     ]);
 
@@ -91,10 +97,10 @@ export default function NpakPage() {
       tz: r.tz.trim(),
       seats: r.seats,
       driver: r.driver_id ? seat(personById(db, r.driver_id) as Person) : null,
-      people: r.people
-        .map((id) => personById(db, id))
-        .filter(Boolean)
-        .map((p) => seat(p as Person)),
+      people: [
+        ...r.people.map((id) => personById(db, id)).filter(Boolean).map((p) => seat(p as Person)),
+        ...r.extra,
+      ],
     }));
 
   const issue = async () => {
@@ -114,9 +120,69 @@ export default function NpakPage() {
   const onTheList = new Set(rows.map((r) => r.tz).filter(Boolean));
   const spare = db.fleet.filter((x) => x.active && !onTheList.has(x.tz));
 
+  const addManual = () => {
+    if (!manual) return;
+    const name = manual.name.trim();
+    if (!name) return toast('נדרש שם');
+    patch(manual.row, {
+      extra: [
+        ...rows[manual.row].extra,
+        { name, pn: manual.pn.trim(), role: manual.role.trim() },
+      ],
+    });
+    setManual(null);
+  };
+
   return (
     <>
       {dialog}
+
+      {manual && (
+        <Dialog
+          open
+          onClose={() => setManual(null)}
+          title="הוספת מי שאינו במערכת"
+          body="נהג מיחידה אחרת, אורח, מי שעדיין לא הוזן. הוא נרשם בנפ״ק כפי שתכתוב כאן."
+          width={520}
+          actions={
+            <>
+              <button className="btn btn-secondary" onClick={() => setManual(null)}>
+                ביטול
+              </button>
+              <button className="btn btn-primary" onClick={addManual}>
+                הוסף לרכב
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Field label="שם מלא" style={{ gridColumn: 'span 2' }}>
+              <input
+                className="input"
+                value={manual.name}
+                onChange={(e) => setManual({ ...manual, name: e.target.value })}
+                placeholder="דרגה ושם"
+              />
+            </Field>
+            <Field label="מספר אישי">
+              <input
+                className="input tabnum"
+                inputMode="numeric"
+                value={manual.pn}
+                onChange={(e) => setManual({ ...manual, pn: e.target.value })}
+              />
+            </Field>
+            <Field label="תפקיד">
+              <input
+                className="input"
+                value={manual.role}
+                onChange={(e) => setManual({ ...manual, role: e.target.value })}
+                placeholder="למשל: נהג, מאבטח"
+              />
+            </Field>
+          </div>
+        </Dialog>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <h1 style={{ fontSize: 22, margin: 0 }}>נפ״ק</h1>
@@ -161,7 +227,7 @@ export default function NpakPage() {
         )}
 
         {rows.map((r, i) => {
-          const room = Math.max(0, r.seats - 1 - r.people.length);
+          const room = Math.max(0, r.seats - 1 - r.people.length - r.extra.length);
           return (
             <div
               key={i}
@@ -233,6 +299,31 @@ export default function NpakPage() {
                 </button>
               </div>
 
+              {r.extra.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {r.extra.map((x, k) => (
+                    <span
+                      key={k}
+                      className="tag tag-outline"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      {x.name} · {x.pn || '—'}
+                      {x.role ? ` · ${x.role}` : ''}
+                      <button
+                        className="btn btn-ghost"
+                        style={{ fontSize: 11, padding: '0 4px', minHeight: 0 }}
+                        aria-label={`הסרת ${x.name}`}
+                        onClick={() =>
+                          patch(i, { extra: r.extra.filter((_, m) => m !== k) })
+                        }
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {force.map((p) => {
                   const on = r.people.includes(p.id);
@@ -254,6 +345,17 @@ export default function NpakPage() {
                     </button>
                   );
                 })}
+                {/* Somebody who is not in the system at all — a driver from
+                    another unit, a guest. He rides in the vehicle either way,
+                    so he belongs on the list that is read at the gate. */}
+                <button
+                  className="btn btn-secondary"
+                  disabled={room === 0}
+                  style={{ fontSize: 11.5, padding: '3px 10px' }}
+                  onClick={() => setManual({ row: i, name: '', pn: '', role: '' })}
+                >
+                  + מי שאינו במערכת
+                </button>
               </div>
             </div>
           );

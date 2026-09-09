@@ -9,6 +9,7 @@ import {
   type NewGear,
   type NewVehicle,
 } from '@/lib/core/defaults';
+import { canSetStaff, fitsStaff } from '@/lib/core/permissions';
 import {
   activeTrainings,
   fullName,
@@ -1033,6 +1034,14 @@ export async function savePerson(
 
   if (row.medical_profile !== null && (row.medical_profile < 21 || row.medical_profile > 97))
     throw new Error('פרופיל רפואי חייב להיות בין 21 ל-97 (או ריק)');
+
+  // The מפקדה is a table of organisation and not a place to park people.
+  if (row.team_id === null) {
+    if (!canSetStaff(user))
+      throw new Error('רק מנהל מערכת או מפקד חפ״ק יכולים לשבץ למפקדה');
+    if (!fitsStaff(row))
+      throw new Error('למפקדה משובצים מח״ט וסמח״ט בלבד, מעבר למנהל המערכת ומפקד החפ״ק');
+  }
 
   // Never let an administrator strip their own management rights — but only an
   // administrator. A team commander editing his own card is not renouncing

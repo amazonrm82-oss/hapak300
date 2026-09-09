@@ -59,6 +59,8 @@ export const RANK_ORDER: Record<string, number> = Object.fromEntries(RANKS.map((
 // "מפקד חפ״ק" here is the post, while the rights that come with it are the
 // `is_hapak_commander` checkbox on the same form.
 export const ROLES = [
+  'מח״ט',
+  'סמח״ט',
   'מפקד צוות',
   'סמל צוות',
   'מפקד חפ״ק',
@@ -94,6 +96,16 @@ export const ESSENTIAL_ROLES = ['חובש'] as const;
  */
 export const ROLE_RASAP = 'רס״פ';
 export const ROLE_SERGEANT = 'סמל צוות';
+
+/**
+ * Who stands in the מפקדה rather than in a team.
+ *
+ * It is a table of organisation, not a preference: the brigade commander and
+ * his deputy. Anyone else belongs to a team — and the two people who run this
+ * system, the administrator and the HQ-party commander, are there by their
+ * post whatever their role says.
+ */
+export const STAFF_ROLES = ['מח״ט', 'סמח״ט'] as const;
 
 export const WEAPONS = [
   'M4 / תבור',

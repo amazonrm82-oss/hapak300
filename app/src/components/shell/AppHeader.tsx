@@ -51,7 +51,15 @@ export function AppHeader() {
 
   if (!db || !user) return null;
 
-  const nav = [...NAV, ...(perms.isAdmin ? ([['/manage', 'ניהול']] as [string, string][]) : [])];
+  // The manifest sits with the other screens, the same place it sits on a
+  // phone under ״עוד״ — and it is a commander's screen, so only they see it.
+  const nav = [
+    ...NAV,
+    ...(perms.isAdmin || user.is_team_commander
+      ? ([['/npak', 'נפ״ק']] as [string, string][])
+      : []),
+    ...(perms.isAdmin ? ([['/manage', 'ניהול']] as [string, string][]) : []),
+  ];
   const notifs = notifsFor(db, user).slice(0, 14);
   const unread = notifsFor(db, user).filter((n) => !n.read).length;
 

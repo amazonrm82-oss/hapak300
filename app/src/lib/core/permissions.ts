@@ -1,4 +1,4 @@
-import { ROLE_RASAP, ROLE_SERGEANT } from './constants';
+import { ROLE_RASAP, ROLE_SERGEANT, STAFF_ROLES } from './constants';
 import type { Db, Person, Training } from './types';
 
 /**
@@ -124,6 +124,28 @@ export function canEditPerson(user: Person | null, target: Person): boolean {
  * roster offered an HQ-party commander a ״נשק והכשרות״ button on the
  * administrator's card — a button that could only ever end in a refusal.
  */
+/**
+ * May this person be placed in the מפקדה — that is, outside any team?
+ *
+ * The מפקדה is a table of organisation and not a place to park people: the
+ * brigade commander and his deputy stand there, and so do the two who run the
+ * system — the administrator and the HQ-party commander — by their post.
+ * Everyone else belongs to a team.
+ */
+export function fitsStaff(p: {
+  role: string;
+  is_admin: boolean;
+  is_hapak_commander: boolean;
+}): boolean {
+  return (
+    p.is_admin || p.is_hapak_commander || (STAFF_ROLES as readonly string[]).includes(p.role)
+  );
+}
+
+/** And who may put someone there: the two who answer for the unit's structure. */
+export const canSetStaff = (user: Person | null): boolean =>
+  !!user && (user.is_admin || user.is_hapak_commander);
+
 export function canEditKitOf(db: Db, user: Person | null, target: Person): boolean {
   if (!user) return false;
   if (user.is_admin) return true;

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/bits';
 import { CERT_TYPES, NVG_TYPES, SIGHT_TYPES, RANK_FULL, RANKS, ROLES } from '@/lib/core/constants';
-import { canEditPerson, canGrantRights, permsFor } from '@/lib/core/permissions';
+import { canEditPerson, canGrantRights, canSetStaff, permsFor } from '@/lib/core/permissions';
 import { fullName } from '@/lib/core/selectors';
 import type { Person } from '@/lib/core/types';
 import { removePerson, resetPin, revokeSessions, savePerson, type PersonForm } from '@/lib/data/mutations';
@@ -241,7 +241,9 @@ export function PersonDialog({ open, person, onClose }: Props) {
               <option value="a">{db.teams.a.name}</option>
               <option value="b">{db.teams.b.name}</option>
               <option value="c">{db.teams.c.name}</option>
-              <option value="">מפקדה (ללא צוות)</option>
+              {/* The מפקדה is a table of organisation: מח״ט וסמח״ט, ומי שמנהל
+                  את המערכת. שיבוץ אליה שמור למנהל המערכת ולמפקד החפ״ק. */}
+              {canSetStaff(user) && <option value="">מפקדה (ללא צוות)</option>}
             </select>
           </Field>
           <Field label="דירוג מפקד תקופתי (1–10)">

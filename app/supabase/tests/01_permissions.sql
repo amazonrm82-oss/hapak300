@@ -1312,3 +1312,44 @@ exception when others then
 end $t$;
 
 reset role; reset request.jwt.claim.sub;
+
+-- ════════ המפקדה היא תקן ════════
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+do $t$ begin
+  update people set team_id = null
+   where id = (select id from people_view where name = 'דניאל כץ');
+  raise notice '❌  144  לוחם רגיל הוכנס למפקדה — כשל';
+exception when others then
+  raise notice '✅  144  למפקדה לא נכנס מי שאינו מח״ט או סמח״ט';
+end $t$;
+
+update people set role = 'סמח״ט', team_id = null
+ where id = (select id from people_view where name = 'דניאל כץ');
+select case when (select team_id from people_view where name = 'דניאל כץ') is null
+            then '✅' else '❌' end || '  145  אבל סמח״ט כן';
+
+-- ומי שאינו מנהל מערכת או מפקד חפ״ק אינו משבץ למפקדה בכלל.
+-- נבדק לפי הערך ולא לפי שגיאה: מדיניות השורות עלולה פשוט לא להתאים לאף
+-- שורה, וזה נראה כמו הצלחה שקטה.
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+
+do $t$ begin
+  update people set role = 'מח״ט', team_id = null
+   where id = (select id from people where name = 'תומר גל');
+exception when others then
+  null;
+end $t$;
+
+reset role; reset request.jwt.claim.sub;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+
+select case when (select team_id from people_view where name = 'תומר גל') is not null
+            then '✅' else '❌' end || '  146  ומי שאינו מנהל או מפקד חפ״ק אינו משבץ למפקדה';
+
+reset role; reset request.jwt.claim.sub;
