@@ -150,6 +150,51 @@ try {
   const rowCount = await page.locator('tbody tr').count();
   check('רשימת האימונים מציגה את מה שנוצר', rowCount >= 2, `${rowCount} שורות`);
 
+  // ── one order covering every training still ahead ──
+  //
+  // Checked here, before this script finishes one training and cancels another:
+  // afterwards there is nothing still ahead, and the dialog would correctly
+  // have nothing to offer.
+  await page.goto(`${BASE}/manage`, { waitUntil: 'networkidle' });
+  await settle(1500);
+  const ordersBtn = page.locator('button:has-text("פקודה לאימונים הבאים")').first();
+  check('כפתור הפקודה לאימונים הבאים קיים', (await ordersBtn.count()) > 0);
+  if (await ordersBtn.count()) {
+    await ordersBtn.click();
+    await settle(1000);
+    const picks = page.locator('[role="dialog"] input[type="checkbox"]');
+    const n = await picks.count();
+    check('ונפתחת רשימה של האימונים שטרם בוצעו', n > 0, `${n} אימונים`);
+
+    const makeBtn = page.locator('[role="dialog"] button:has-text("הפקת פקודה")').first();
+    const ordersPopupP = page.waitForEvent('popup', { timeout: 12000 }).catch(() => null);
+    // disabled when nothing is ticked; clicking it would hang the run rather
+    // than fail the check, and a hung run reports nothing about the rest
+    if (await makeBtn.isEnabled().catch(() => false)) await makeBtn.click();
+    const op = await ordersPopupP;
+    check('והפקודה נפתחת להדפסה', !!op);
+    if (op) {
+      await op.waitForLoadState('domcontentloaded').catch(() => {});
+      const doc = await op.locator('body').innerText();
+      // the covering schedule AND the full body of a training — a document
+      // with only the summary table is a schedule, not an order
+      check(
+        'ובתוכה לו״ז כללי וגם פקודה מלאה לכל אימון',
+        doc.includes('פקודת אימונים') &&
+          doc.includes('לו״ז יום האימון') &&
+          doc.includes('לוגיסטיקה'),
+        doc.slice(0, 110).replace(/\n/g, ' '),
+      );
+      // and one section per training that was ticked
+      const sections = (doc.match(/פקודת אימון ·/g) ?? []).length;
+      check('ופקודה אחת לכל אימון שנבחר', sections === n, `${sections} פקודות מול ${n} אימונים`);
+      await op.close();
+    }
+    await page.locator('[role="dialog"] button:has-text("סגור")').first().click().catch(() => {});
+    await settle(700);
+  }
+
+
   const urls = [];
   for (let i = 0; i < Math.min(2, rowCount); i++) {
     await page.goto(`${BASE}/trainings`, { waitUntil: 'networkidle' });

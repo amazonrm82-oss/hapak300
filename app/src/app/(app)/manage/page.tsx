@@ -1,16 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { TrainingFormDialog } from '@/components/dialogs/TrainingFormDialog';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { AuditLog } from '@/components/AuditLog';
 import { PeriodCard } from '@/components/PeriodCard';
+import { useShareOrder } from '@/components/dialogs/TextDialog';
 import { Field, SectionCard, Tag } from '@/components/ui/bits';
 import { TRAINING_STATUS, WEEKDAYS } from '@/lib/core/constants';
-import { pad, weekOf } from '@/lib/core/dates';
-import { fullName, periodWeeks, personById, trainingTitle } from '@/lib/core/selectors';
+import { fmtShort, pad, weekOf } from '@/lib/core/dates';
+import { ordersHTML, ordersText, printHTML } from '@/lib/core/exports';
+import { fullName, periodWeeks, personById, topicName, trainingTitle } from '@/lib/core/selectors';
 import type { RotationConfig, TrainingFull, TrainingTeam } from '@/lib/core/types';
 import {
   addQuickTraining,
@@ -40,6 +42,7 @@ export default function ManagePage() {
   const [clearOpen, setClearOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TrainingFull | null>(null);
   const [fullFormOpen, setFullFormOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
 
   if (!db || !user) return null;
@@ -78,6 +81,9 @@ export default function ManagePage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={() => setGeneratorOpen(true)} style={{ whiteSpace: 'nowrap' }}>
             יצירת סבב אוטומטי
+          </button>
+          <button className="btn btn-secondary" onClick={() => setOrdersOpen(true)} style={{ whiteSpace: 'nowrap' }}>
+            פקודה לאימונים הבאים
           </button>
           <button className="btn btn-secondary" onClick={() => setShiftOpen(true)} style={{ whiteSpace: 'nowrap' }}>
             הזזת כל הלו״ז
@@ -391,6 +397,7 @@ export default function ManagePage() {
 
       <RotationDialog open={generatorOpen} onClose={() => setGeneratorOpen(false)} />
       <ShiftDialog open={shiftOpen} onClose={() => setShiftOpen(false)} />
+      <OrdersDialog open={ordersOpen} onClose={() => setOrdersOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <TrainingFormDialog open={fullFormOpen} training={null} onClose={() => setFullFormOpen(false)} />
 
@@ -690,5 +697,137 @@ function ShiftDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
         />
       </Field>
     </Dialog>
+  );
+}
+
+/**
+ * One order for several trainings at once.
+ *
+ * Publishing a month of training used to mean opening six trainings and
+ * printing six orders. Here the commander picks from what is still ahead —
+ * anything not finished and not cancelled — and gets one document: a covering
+ * schedule, then every training in full, one per page.
+ *
+ * A training with no instructor or no commander yet is still offered, and
+ * marked: an order that goes out with a hole in it is the commander's call to
+ * make, not a reason to hide the training from the list.
+ */
+function OrdersDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { db, toast } = useApp();
+  const { toWhatsApp, dialog: shareDialog } = useShareOrder(toast);
+  const [picked, setPicked] = useState<string[]>([]);
+
+  const upcoming = (db?.trainings ?? [])
+    .filter((t) => t.status !== 'done' && t.status !== 'cancelled')
+    .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+
+  // everything ahead is ticked each time the dialog opens — the common case is
+  // "all of them", and unticking two is less work than ticking six
+  const ids = upcoming.map((t) => t.id).join(',');
+  useEffect(() => {
+    if (open) setPicked(ids ? ids.split(',') : []);
+  }, [open, ids]);
+
+  if (!open || !db) return null;
+
+  const chosen = upcoming.filter((t) => picked.includes(t.id));
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  return (
+    <>
+      <Dialog
+        open
+        onClose={onClose}
+        width={620}
+        title="פקודה לאימונים הבאים"
+        body="בחר את האימונים שייכנסו לפקודה. כל אימון מופיע בה במלואו — לו״ז יום, לוגיסטיקה, רכבים, תחמושת ומזון — בדיוק כמו בפקודה של אימון בודד, ולפניהם לו״ז כללי של כולם."
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={onClose}>
+              סגור
+            </button>
+            <button
+              className="btn btn-secondary"
+              disabled={!chosen.length}
+              onClick={() => toWhatsApp(ordersText(db, chosen), 'פקודת האימונים')}
+            >
+              שליחה בוואטסאפ
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={!chosen.length}
+              onClick={() => {
+                const ok = printHTML(db.settings.app_name, ordersHTML(db, chosen));
+                toast(ok ? 'נפתח חלון הדפסה — שמור כ-PDF' : 'הדפדפן חסם את חלון ההדפסה');
+              }}
+            >
+              הפקת פקודה (PDF)
+            </button>
+          </>
+        }
+      >
+        {!upcoming.length ? (
+          <span style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>
+            אין אימונים שטרם בוצעו. צור אימון או סבב, ואז אפשר להוציא פקודה.
+          </span>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" onClick={() => setPicked(upcoming.map((t) => t.id))}>
+                בחר הכול
+              </button>
+              <button className="btn btn-ghost" onClick={() => setPicked([])}>
+                נקה
+              </button>
+              <span style={{ fontSize: 12.5, color: 'var(--color-neutral-500)' }}>
+                {chosen.length} מתוך {upcoming.length} נבחרו
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '46vh', overflow: 'auto' }}>
+              {upcoming.map((t) => {
+                const miss = [
+                  !t.instructor_id && 'ללא מדריך',
+                  !t.commander_id && 'ללא מפקד אימון',
+                  !t.day_blocks.length && 'ללא לו״ז יום',
+                ].filter(Boolean) as string[];
+                return (
+                  <label
+                    key={t.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'auto minmax(0,1fr) auto',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: '8px 2px',
+                      borderBottom: '1px solid var(--color-neutral-900)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input type="checkbox" checked={picked.includes(t.id)} onChange={() => toggle(t.id)} />
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ fontSize: 13.5 }}>
+                        {trainingTitle(db, t)} · {topicName(db, t.topic_id)}
+                      </span>
+                      <span style={{ fontSize: 11.5, color: 'var(--color-neutral-500)' }}>
+                        {fmtShort(t.date)} · {t.start}–{t.end} · {t.location || 'ללא מיקום'} ·{' '}
+                        {TRAINING_STATUS[t.status]}
+                      </span>
+                    </div>
+                    {miss.length > 0 && (
+                      <span style={{ fontSize: 11, color: 'var(--color-accent-300)', whiteSpace: 'nowrap' }}>
+                        {miss.join(' · ')}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Dialog>
+      {shareDialog}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { FIRE_MODE_LABEL, STATUS_LABEL } from './constants';
-import { dateLine, fmtFull } from './dates';
+import { dateLine, fmtFull, pad } from './dates';
 import {
   fullName,
   participants,
@@ -107,6 +107,77 @@ export function orderHTML(db: Db, t: TrainingFull): string {
   );
 }
 
+/**
+ * One order covering several trainings — the period's orders in one document.
+ *
+ * A commander publishing a month of training does not want to open six
+ * trainings and print six orders. This is the same order, repeated: a covering
+ * schedule of everything that is coming, and then each training in full, one
+ * per page, in the order they happen.
+ *
+ * Nothing is summarised away — the per-training part is exactly what the single
+ * order prints, so a copy from this document and a copy from the training
+ * screen cannot say different things.
+ */
+export function ordersHTML(db: Db, trainings: TrainingFull[]): string {
+  const list = [...trainings].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  if (!list.length) return '<h1>לא נבחרו אימונים</h1>';
+
+  const span =
+    list.length === 1
+      ? fmtFull(list[0].date)
+      : `${fmtFull(list[0].date)} — ${fmtFull(list[list.length - 1].date)}`;
+
+  const summary = rows(
+    list.map((t, i) => [
+      pad(i + 1),
+      dateLine(t),
+      trainingTitle(db, t),
+      topicName(db, t.topic_id),
+      t.location,
+      `${t.departure} מ${t.pickup}`,
+      fullName(personById(db, t.instructor_id)),
+      fullName(personById(db, t.commander_id)),
+    ]),
+  );
+
+  return (
+    `<h1>פקודת אימונים · ${esc(db.settings.unit_name)}</h1>` +
+    `<h2>תקופת ${esc(db.settings.period_name)} · ${esc(span)} · ${list.length} אימונים</h2>` +
+    `<table><thead><tr><th>#</th><th>מועד</th><th>אימון</th><th>נושא</th><th>מיקום</th>` +
+    `<th>יציאה</th><th>מדריך</th><th>מפקד אימון</th></tr></thead><tbody>${summary}</tbody></table>` +
+    list
+      .map(
+        (t, i) =>
+          `<div class="page-break"><p class="muted" style="margin:0 0 6px">אימון ${pad(i + 1)} מתוך ${pad(list.length)}</p>` +
+          orderHTML(db, t) +
+          `</div>`,
+      )
+      .join('')
+  );
+}
+
+/** The same thing as plain text, for WhatsApp. */
+export function ordersText(db: Db, trainings: TrainingFull[]): string {
+  const list = [...trainings].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  if (!list.length) return 'לא נבחרו אימונים';
+
+  const head = [
+    `פקודת אימונים — ${db.settings.unit_name}`,
+    `תקופת ${db.settings.period_name} · ${list.length} אימונים`,
+    '',
+    'לו״ז כללי:',
+    ...list.map(
+      (t, i) =>
+        `  ${pad(i + 1)}. ${dateLine(t)} · ${trainingTitle(db, t)} · ${topicName(db, t.topic_id)} · ${t.location}`,
+    ),
+  ];
+
+  return [head.join('\n'), ...list.map((t) => orderText(db, t))].join(
+    '\n\n────────────────────\n\n',
+  );
+}
+
 /** Attendance report as printable HTML. */
 export function attendanceHTML(db: Db, t: TrainingFull): string {
   const body = participants(db, t)
@@ -159,7 +230,10 @@ export function printHTML(title: string, bodyHTML: string): boolean {
       `.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;margin:-24px -24px 18px;padding:12px 16px;` +
       `display:flex;align-items:center;gap:12px;font-size:14px}` +
       `.bar a{color:#0a58ca;text-decoration:none;font-weight:600}` +
-      `@media print{.bar{display:none}body{padding:0}}</style></head><body>` +
+      // a combined order is one document per training; on paper each starts
+      // on its own page, and on screen a rule shows where the break will fall
+      `.page-break{margin-top:28px;border-top:2px solid #ddd;padding-top:18px}` +
+      `@media print{.bar{display:none}body{padding:0}.page-break{break-before:page;border-top:0;margin-top:0}}</style></head><body>` +
       `<div class="bar"><a href="${home}">חזרה למערכת</a>` +
       `<span style="color:#666;font-size:12.5px">להדפסה חוזרת — תפריט השיתוף של הדפדפן</span></div>` +
       `${bodyHTML}` +
